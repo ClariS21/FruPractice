@@ -1,0 +1,16 @@
+.vs/
+obj/
+/logs/
+/docs/*
+!/docs/superpowers/
+/Reference/
+bin/
+.idea/
+.claude/
+FFXIV-RaidsRewritten-Reference.md
+*.user
+__pycache__
+/tools/.venv/
+TestResults/
+logs/
+.tmp/

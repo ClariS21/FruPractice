@@ -1,0 +1,20 @@
+{
+  "Name": "Sample Gunbreaker",
+  "ClassJob": 37,
+  "Customize": "AQEBMgIBAQMDAwMDAwMDAwMDAwMDAwMDAwM=",
+  "Equipment": [
+    { "Id": 100, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 101, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 102, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 103, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 104, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 105, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 106, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 107, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 108, "Variant": 1, "Stain0": 0, "Stain1": 0 },
+    { "Id": 109, "Variant": 1, "Stain0": 0, "Stain1": 0 }
+  ],
+  "MainHand": { "Id": 2501, "Type": 41, "Variant": 2, "Stain0": 0, "Stain1": 0 },
+  "OffHand": { "Id": 0, "Type": 0, "Variant": 0, "Stain0": 0, "Stain1": 0 },
+  "Label": "Sample GNB"
+}

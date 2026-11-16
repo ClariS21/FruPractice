@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The packager's default targets, with an explicit file list: the top-level output files it zips
+     by default, plus the shipped main-tank looks in their folder (it never zips subfolders itself). -->
+<Project>
+    <Target Name="DalamudPackagerDebug"
+            AfterTargets="Build"
+            Condition="'$(Configuration)' == 'Debug'">
+        <DalamudPackager ProjectDir="$(ProjectDir)"
+                         OutputPath="$(OutputPath)"
+                         AssemblyName="$(AssemblyName)"
+                         MakeZip="false" />
+    </Target>
+
+    <Target Name="DalamudPackagerRelease"
+            AfterTargets="Build"
+            Condition="'$(Configuration)' == 'Release'">
+        <ItemGroup>
+            <PackagedTopLevel Include="$(ProjectDir)$(OutputPath)*.dll;$(ProjectDir)$(OutputPath)*.json"
+                              Exclude="$(ProjectDir)$(OutputPath)$(AssemblyName).json" />
+            <PackagedLook Include="$(ProjectDir)Resources\main-tank-looks\*.json" />
+            <PackagedFile Include="@(PackagedTopLevel->'%(Filename)%(Extension)')" />
+            <!-- The packager writes the manifest after the glob is evaluated. -->
+            <PackagedFile Include="$(AssemblyName).json" />
+            <PackagedFile Include="@(PackagedLook->'main-tank-looks\%(Filename)%(Extension)')" />
+        </ItemGroup>
+        <DalamudPackager ProjectDir="$(ProjectDir)"
+                         OutputPath="$(OutputPath)"
+                         AssemblyName="$(AssemblyName)"
+                         MakeZip="true"
+                         Include="@(PackagedFile)" />
+    </Target>
+</Project>
