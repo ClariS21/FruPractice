@@ -33,7 +33,8 @@ public sealed class FruP3ApocalypseAi : IScenarioAi<FruP3ApocalypseState>
         var ai = new AiManager(world);
         ai.Move(2.2f, () => ByRole(role => Setup(role, adjusted: false)), arrivalTime: 12.3f);
         FlexSwapAfterDebuffs(ai);
-        ai.Move(20.2f, () => ByRole(FirstStack), jitter: 0.3f, arrivalTime: WaterAt(1));
+        // The collapse follows right after the flex; the stack then holds until WaterAt(1).
+        ai.Move(16.8f, () => ByRole(FirstStack), jitter: 0.3f, arrivalTime: 18.6f);
         ai.Move(22.85f, () => ByRole(role => Setup(role, spread: true)), jitter: 0.3f, arrivalTime: 24.8f);
         ai.Move(24.85f, () => ByRole(role => Setup(role, adjusted: false, spread: true)), jitter: 0.3f, arrivalTime: 28f);
         ai.Move(28f, () => ByRole(Spread), jitter: 0.3f, arrivalTime: WaveAt(0));

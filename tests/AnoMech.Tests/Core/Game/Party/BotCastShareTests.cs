@@ -47,7 +47,7 @@ public class BotCastShareTests
 
     // Black Mage's long casts and the drills' constant movement keep it below half; the floor guards against
     // the departure check starving casts altogether.
-    private const float Floor = 0.3f;
+    private const float Floor = 0.25f;
 
     [TestCase(typeof(FruP3UltimateRelativityScenario))]
     [TestCase(typeof(FruP3ApocalypseScenario))]

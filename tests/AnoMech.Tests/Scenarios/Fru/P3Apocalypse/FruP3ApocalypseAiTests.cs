@@ -22,7 +22,7 @@ public class FruP3ApocalypseAiTests
         var departures = new Dictionary<PartyRole, float>();
         var run = ScenarioRun.Execute(typeof(FruP3ApocalypseScenario), 0, seed, new ScenarioRunOptions
         {
-            StopAt = 20f,
+            StopAt = 16.7f,
             Probe = p =>
             {
                 if (p.Time < debuffsAt) return;
@@ -39,6 +39,41 @@ public class FruP3ApocalypseAiTests
         foreach (var (role, delay) in departures)
             Assert.That(delay, Is.InRange(1.5f - FrameSlack, 2.0f + 2 * FrameSlack), $"{role} departed {delay:F2}s after the debuffs");
     }
+
+    [Test, Combinatorial]
+    public void BotsCollapseIntoTheirStacksRightAfterTheFlex(
+        [Values(0, 1, 2, 3)] int seed,
+        [Values(PartyRole.CasterDps, PartyRole.MainTank)] PartyRole player)
+    {
+        var centres = new[]
+        {
+            Centre(DefaultSlots[..4]),
+            Centre(DefaultSlots[4..]),
+        };
+        var worst = new Dictionary<PartyRole, float>();
+        var run = ScenarioRun.Execute(typeof(FruP3ApocalypseScenario), 0, seed, new ScenarioRunOptions
+        {
+            StopAt = 18.7f,
+            PlayerRole = player,
+            Probe = p =>
+            {
+                if (!p.Crossed(18.6f)) return;
+                foreach (var role in Enum.GetValues<PartyRole>())
+                {
+                    if (role == player || p.Member(role) is not { } member) continue;
+                    var position = member.Position;
+                    worst[role] = centres.Min(c => Vector3Distance(c, position));
+                }
+            },
+        });
+        Assert.That(run.Passed, run.ToString);
+        Assert.That(worst, Is.Not.Empty);
+        foreach (var (role, distance) in worst)
+            Assert.That(distance, Is.LessThan(1.5f), $"{role} is {distance:F2}y from its stack at 18.6s");
+    }
+
+    private static System.Numerics.Vector3 Centre((PartyRole Role, float X, float Z)[] slots)
+        => new(slots.Average(s => s.X), 0, slots.Average(s => s.Z));
 
     private static readonly (PartyRole Role, float X, float Z)[] DefaultSlots =
     [
