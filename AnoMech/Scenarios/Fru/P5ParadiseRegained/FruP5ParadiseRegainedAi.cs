@@ -68,11 +68,7 @@ public sealed class FruP5ParadiseRegainedAi : IScenarioAi<FruP5ParadiseRegainedS
 
     private Vector3? StackUnderFirstTower(PartyRole role) => state.Rotate(new Vector3(((int)role - 3.5f) * 0.35f, 0f, 7f));
 
-    // The tank who takes the first wing's cleave stands where the main tank's spots are; the other tank where the off tank's are.
-    private PartyRole Logical(PartyRole role)
-        => role is PartyRole.MainTank or PartyRole.OffTank ? role == state.FirstCleaveSeat ? PartyRole.MainTank : PartyRole.OffTank : role;
-
-    private Vector3 FirstWingSpot(PartyRole role) => Logical(role) switch
+    private Vector3 FirstWingSpot(PartyRole role) => role switch
     {
         PartyRole.MainTank => new(state.DarkFirst ? -6.0622f : 6.0622f, 0f, -3.5f),
         PartyRole.OffTank => state.DarkFirst ? new(0f, 0f, 1f) : new(10f, 0f, 10f),
@@ -84,7 +80,7 @@ public sealed class FruP5ParadiseRegainedAi : IScenarioAi<FruP5ParadiseRegainedS
         _ => new(3.8f, 0f, 9.7f),
     };
 
-    private Vector3 SecondWingSpot(PartyRole role) => Logical(role) switch
+    private Vector3 SecondWingSpot(PartyRole role) => role switch
     {
         PartyRole.MainTank => new(0f, 0f, state.DarkFirst ? -14f : -1f),
         PartyRole.OffTank => new(state.DarkFirst ? -6.0622f : 6.0622f, 0f, 3.5f),

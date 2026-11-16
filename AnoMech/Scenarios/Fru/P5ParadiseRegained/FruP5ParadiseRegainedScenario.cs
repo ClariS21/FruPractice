@@ -50,7 +50,6 @@ public sealed class FruP5ParadiseRegainedScenario : IScenario
         state = stateParam;
         Array.Clear(towers);
         Array.Clear(linesAimed);
-        state.FirstCleaveSeat = FruP5WingsTankPair.FirstCleaveSeat(JobAt(PartyRole.MainTank), JobAt(PartyRole.OffTank));
         if (selectedAi is { } idx && idx < AiStrats.Count)
             ((IScenarioAi<FruP5ParadiseRegainedState>)AiStrats[idx]).Run(state, world);
 
@@ -72,12 +71,12 @@ public sealed class FruP5ParadiseRegainedScenario : IScenario
         world.Events.Add(12.4f, TargetWingBait);
         world.Events.Add(12.4f, () => BattleTalk(0x28, GaiaBattleTalk));
         world.Events.Add(TowerShowAt(2), () => ShowTower(2));
-        world.Events.Add(15.5f, () => FaceTank(state.FirstCleaveSeat));
+        world.Events.Add(15.5f, () => FaceTank(PartyRole.MainTank));
         world.Events.Add(TowerHitAt(0), () => { ResolveTower(0); WingCleave(0); });
         world.Events.Add(16.5f, () => WingBuster(0));
         world.Events.Add(17f, () => TetherWingBait(1));
         world.Events.Add(TowerHitAt(1), () => ResolveTower(1));
-        world.Events.Add(19.4f, () => { FaceTank(FruP5WingsTankPair.Other(state.FirstCleaveSeat)); WingCleave(1); });
+        world.Events.Add(19.4f, () => { FaceTank(PartyRole.OffTank); WingCleave(1); });
         world.Events.Add(20.2f, () => { WingBuster(1); pandora?.SetModelState(0); });
         world.Events.Add(20.7f, () => wingTether?.Despawn());
         world.Events.Add(TowerHitAt(2), () => ResolveTower(2));
@@ -129,8 +128,6 @@ public sealed class FruP5ParadiseRegainedScenario : IScenario
         world.Map.AddEffect(MapEffect.TowerBase, (byte)(slot - MapEffect.ParadiseFirstTower + MapEffect.ParadiseFirstTowerBase));
         towers[tower] = new MapEffectTower(world.Map, slot, state.TowerPosition(tower), TowerRadius, MapEffect.TowerOccupied[..2], MapEffect.DarklitTowerEmpty);
     }
-
-    private JobId JobAt(PartyRole role) => (JobId)((world.Party.Get(role) as ISimPartyMember)?.ClassJob ?? 0);
 
     private void BattleTalk(uint line, uint speaker) => world.Map.DirectorUpdate(0x80000027U, line, 0x2U, speaker, NoActor);
 

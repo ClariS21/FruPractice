@@ -9,26 +9,28 @@ namespace AnoMech.Scenarios.Fru.P4Full;
 
 public sealed class FruP4FullAi
 {
-    private static readonly Vector3 StackSpot = new(0f, 0f, 8f);
-
     public void Run(SimWorld world)
     {
         var ai = new AiManager(world);
         ai.Move(0.2f, () => ByRole(_ => Vector3.Zero), jitter: 0.3f, arrivalTime: 5f);
-        ai.Move(75.5f, () => ByRole(_ => MornAfahSpot(world)), jitter: 0.3f, arrivalTime: 79.5f);
-        var departures = world.Stream("p4-final-morn-afah-departure");
+        // Both Morn Afahs are a full-party stack at the arena centre. The first departs after the last Akh Morn hit
+        // and arrives before the 82.3 s damage; the final one departs at 157.8 s and arrives before the 165.0 s damage.
+        StackAtCentre(ai, world, "p4-first-morn-afah-departure", 75.5f, 79.5f);
+        StackAtCentre(ai, world, "p4-final-morn-afah-departure", 157.8f, 161.5f);
+    }
+
+    private static void StackAtCentre(AiManager ai, SimWorld world, string stream, float departAfter, float arriveBy)
+    {
+        var departures = world.Stream(stream);
         foreach (var role in Enum.GetValues<PartyRole>())
         {
             var stackRole = role;
-            ai.Move(157.8f + departures.NextSingle(), () => ByRole(r => r == stackRole ? FinalMornAfahSpot(r) : null),
-                jitter: 0f, arrivalTime: 161.5f, settleFraction: 1f);
+            ai.Move(departAfter + departures.NextSingle(), () => ByRole(r => r == stackRole ? MornAfahSpot(r) : null),
+                jitter: 0f, arrivalTime: arriveBy, settleFraction: 1f);
         }
     }
 
-    private static Vector3 MornAfahSpot(SimWorld world)
-        => world.Party.Get(PartyRole.MainTank) is { } tank && !world.Party.IsBotDriven(tank) ? tank.Position : StackSpot;
-
-    private static Vector3 FinalMornAfahSpot(PartyRole role)
+    private static Vector3 MornAfahSpot(PartyRole role)
         => new(0f, 0f, ((int)role % 2 == 0 ? 1f : -1f) * (0.3f + (int)role / 2 * 0.15f));
 
     private static IAiMove ByRole(Func<PartyRole, Vector3?> at)
