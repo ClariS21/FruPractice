@@ -1,0 +1,82 @@
+{
+  "Name": "Hana Shirosaki",
+  "ClassJob": 37,
+  "Customize": "AwEBAAYCmAAwkVNXBQADkQMFAoOhAARkDiQ=",
+  "Equipment": [
+    {
+      "Id": 279,
+      "Variant": 1,
+      "Stain0": 0,
+      "Stain1": 0
+    },
+    {
+      "Id": 6197,
+      "Variant": 1,
+      "Stain0": 14,
+      "Stain1": 30
+    },
+    {
+      "Id": 279,
+      "Variant": 1,
+      "Stain0": 0,
+      "Stain1": 0
+    },
+    {
+      "Id": 789,
+      "Variant": 1,
+      "Stain0": 30,
+      "Stain1": 30
+    },
+    {
+      "Id": 6138,
+      "Variant": 1,
+      "Stain0": 1,
+      "Stain1": 1
+    },
+    {
+      "Id": 53,
+      "Variant": 1,
+      "Stain0": 0,
+      "Stain1": 0
+    },
+    {
+      "Id": 53,
+      "Variant": 1,
+      "Stain0": 0,
+      "Stain1": 0
+    },
+    {
+      "Id": 53,
+      "Variant": 1,
+      "Stain0": 0,
+      "Stain1": 0
+    },
+    {
+      "Id": 53,
+      "Variant": 1,
+      "Stain0": 0,
+      "Stain1": 0
+    },
+    {
+      "Id": 53,
+      "Variant": 1,
+      "Stain0": 0,
+      "Stain1": 0
+    }
+  ],
+  "MainHand": {
+    "Id": 2501,
+    "Type": 4,
+    "Variant": 2,
+    "Stain0": 0,
+    "Stain1": 0
+  },
+  "OffHand": {
+    "Id": 0,
+    "Type": 0,
+    "Variant": 0,
+    "Stain0": 0,
+    "Stain1": 0
+  },
+  "Label": "C"
+}
