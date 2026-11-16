@@ -89,7 +89,7 @@ public sealed class FruP3UltimateRelativityScenario : IScenario
         world.Events.Add(59.2f, ShellCrusher);
         if (!cast.Chained) return;
         world.Events.Add(StunEndAt, ThawTime);
-        world.Events.Add(60.5f, DespawnHourglasses);
+        world.Events.Add(LaserHitAt(2, LaserShots - 1) + HourglassLingerSeconds, DespawnHourglasses);
     }
 
     private void StopTime()
@@ -109,8 +109,13 @@ public sealed class FruP3UltimateRelativityScenario : IScenario
         world.Map.AddEffect(MapEffect.ThawFloor, MapEffect.OracleStage);
     }
 
+    // Relativity's hourglasses leave a beat after the last laser. The scenery objects need the hide
+    // map effect as well as the actors despawning, or they stay lit through the rest of the phase.
+    private const float HourglassLingerSeconds = 1.5f;
+
     private void DespawnHourglasses()
     {
+        SetHourglasses(MapEffect.HourglassHide, _ => true);
         foreach (var hourglass in hourglasses) hourglass?.Despawn();
         Array.Clear(hourglasses);
     }

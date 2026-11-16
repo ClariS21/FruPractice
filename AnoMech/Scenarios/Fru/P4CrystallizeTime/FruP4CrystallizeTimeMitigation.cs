@@ -119,21 +119,24 @@ internal static class FruP4CrystallizeTimeMitigation
     ];
 
     // The full phase's Akh Morn Afah. Mitigation is judged at Morn Afah's snapshot, 1.8 s before its damage lands:
-    // the 15 s mits go out before the first Akh Morn so they cover the four hits and Morn Afah (the Feint on the
-    // Oracle, whose damage Morn Afah is); the shields, which the Akh Morns eat, are pressed again after the last hit;
-    // the 10 s buttons can't span both and cover Morn Afah, the bigger hit. The phys ranged party mit is pressed once, here:
-    // the sheet lists it for both Akh Morn Afahs and the Hallowed Wings, 90 s apart at best.
+    // the 15 s mits go out before the first Akh Morn so they cover the four hits and Morn Afah (Reprisal on the
+    // Usurper and the Oracle); the shields, which the Akh Morns eat, are pressed again after the last hit;
+    // the 10 s buttons can't span both and cover Morn Afah, the bigger hit. Feint and the phys ranged party mit go once per Akh Morn Afah,
+    // 90 s apart (the sheet's default; Hallowed Wings is its alternative, used by the standalone drill).
     private static MitPlanEntry[] AkhMornAndMornAfah(float m)
     {
         var snapshot = m - MornAfahDamageDelay;
         float[] both = [AkhMorn1, AkhMorn2, AkhMorn3, AkhMorn4, m];
         float[] afah = [m];
         var cover = AkhMorn1 - CoverBothLead;
+        var repress = snapshot - 3.6f;
         return
         [
             new(MT, MitActionId.Reprisal, cover, "Akh Morn Afah", both),
-            new(D1, Feint, cover, "Akh Morn Afah (Morn Afah's Oracle)", both, On: FruMitigation.Oracle),
-            new(D3, PartyMit, cover, "Akh Morn Afah", both),
+            // Feint (Shiva) and the phys ranged Party Mit, the sheet's second Akh Morn Afah: the first went out 90.5 s earlier, so these wait
+            // for their recast and cover Morn Afah's snapshot (the Akh Morns are over by then).
+            new(D1, Feint, repress, "Akh Morn Afah (Shiva)", afah, On: FruMitigation.Usurper),
+            new(D3, PartyMit, repress, "Akh Morn Afah", afah),
             new(WHM, Temperance, cover, "Akh Morn Afah", both),
             new(AST, NeutralSect, cover - 1f, "Akh Morn Afah", []),
             new(AST, SunSign, cover, "Akh Morn Afah", both),

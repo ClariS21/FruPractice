@@ -3,7 +3,7 @@
         "Author":  "Hanachan (based on AnoMech by Anomek)",
         "Name":  "FRU Practice",
         "InternalName":  "FruPractice",
-        "AssemblyVersion":  "0.1.1.0",
+        "AssemblyVersion":  "0.1.2.0",
         "Description":  "FRU phases 3 to 5 practice, based on AnoMech. Spawns fake party members and bosses client-side so you can practice the mechanics without a party.",
         "ApplicableVersion":  "any",
         "RepoUrl":  "https://github.com/ClariS21/FruPractice",
@@ -22,7 +22,7 @@
         "DownloadLinkTesting":  "https://github.com/ClariS21/FruPractice/releases/latest/download/latest.zip",
         "IsHide":  false,
         "IsTestingExclusive":  false,
-        "LastUpdate":  1794793365,
+        "LastUpdate":  1794797993,
         "AcceptsFeedback":  false
     }
 ]

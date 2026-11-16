@@ -1,3 +1,4 @@
+using AnoMech.Core.Native.Interfaces;
 using System.Globalization;
 using AnoMech.Scenarios.Fru.P3Full;
 
@@ -52,5 +53,55 @@ public class FruP3FullScenarioTests
         var cells = line.Split(',');
         var parsed = uint.TryParse(cells[4], out var id);
         return (float.Parse(cells[0], CultureInfo.InvariantCulture), cells[1], parsed ? id : 0);
+    }
+}
+
+public class FruP3FullHourglassCleanupTests
+{
+    private const uint HourglassBaseId = 17832;
+    private const int FirstHourglassSlot = 26;
+    private const int HourglassHideState = 4;
+
+    // After Relativity the hourglasses must be gone: their actors despawned and their scenery hidden.
+    [Test]
+    public void HourglassesAreGoneAfterRelativityResolves()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"frup3full-hg-{Guid.NewGuid():N}.csv");
+        try
+        {
+            var loaded = false;
+            var run = ScenarioRun.Execute(typeof(FruP3FullScenario), 0, 1, new ScenarioRunOptions
+            {
+                TimelinePath = path,
+                StopAt = 80f,
+                Probe = _ =>
+                {
+                    if (loaded) return;
+                    loaded = true;
+                    Natives.MapEffects.Loaded = true;
+                },
+            });
+            Assert.That(run.Passed, run.ToString);
+            var rows = File.ReadLines(path).Skip(1).Select(l => l.Split(',')).ToList();
+            var time = (string[] r) => float.Parse(r[0], CultureInfo.InvariantCulture);
+            var hourglasses = rows.Where(r => r[1] == "spawn" && r[4] == HourglassBaseId.ToString()).Select(r => r[2]).ToList();
+            Assert.That(hourglasses, Has.Count.EqualTo(8));
+            foreach (var id in hourglasses)
+            {
+                var despawn = rows.Where(r => r[1] == "despawn" && r[2] == id).ToList();
+                Assert.That(despawn, Has.Count.EqualTo(1), $"hourglass {id} despawned");
+                Assert.That(time(despawn[0]), Is.LessThan(74f));
+            }
+            for (var slot = FirstHourglassSlot; slot < FirstHourglassSlot + 8; slot++)
+            {
+                var hide = rows.Where(r => r[1] == "map_effect" && r[4] == slot.ToString() && r[11].Contains($"state={HourglassHideState} ")).ToList();
+                Assert.That(hide, Has.Count.EqualTo(1), $"slot {slot} hidden");
+                Assert.That(time(hide[0]), Is.LessThan(74f));
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 }

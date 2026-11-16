@@ -29,6 +29,7 @@ public static class MitPlan
             foreach (var (slot, job) in SlotsFor(e, jobs))
             {
                 if (e.Jobs is { } only && Array.IndexOf(only, job) < 0) continue;
+                if (e.Partners is { } partners && !(PartnerOf(slot) is { } other && jobs.TryGetValue(other, out var partner) && Array.IndexOf(partners, partner) >= 0)) continue;
                 if (MitCatalogue.For(e.ActionId, job) is not { } def || !MitCatalogue.CanPress(job, def)) continue;
                 var (open, close, hard, soft) = Window(e.At, e.Covers, def.Duration);
                 resolved.Add(new(i, slot, job, def, e.At, e.Label, hard, soft, open, close, e.IsExtra, e.IsPreStart));
@@ -36,6 +37,13 @@ public static class MitPlan
         }
         return resolved;
     }
+
+    private static PartyRole? PartnerOf(PartyRole slot) => slot switch
+    {
+        PartyRole.MainTank => PartyRole.OffTank,
+        PartyRole.OffTank => PartyRole.MainTank,
+        _ => null,
+    };
 
     private static IEnumerable<(PartyRole Slot, JobId Job)> SlotsFor(MitPlanEntry e, IReadOnlyDictionary<PartyRole, JobId> jobs)
     {

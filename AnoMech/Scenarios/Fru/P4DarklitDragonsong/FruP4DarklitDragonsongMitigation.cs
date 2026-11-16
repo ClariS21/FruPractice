@@ -92,8 +92,9 @@ internal static class FruP4DarklitDragonsongMitigation
         new(SGE, Kerachole, AfterSecondSomber, "Akh Morn Afah (after the second Somber Dance)", AkhMorns),
         new(SGE, EukrasianPrognosisII, AkhMorn1 - Short, "Akh Morn Afah", AkhMorns),
         new(SGE, Panhaima, AkhMorn1 - Short, "Akh Morn Afah", akhMornsAndAfah),
-        // The full phase's Feint goes to the second Akh Morn Afah: 90 s apart is out of reach for the two, and the chain would drop the later.
-        .. (withMornAfah ? Array.Empty<MitPlanEntry>() : new MitPlanEntry[] { new(D1, Feint, cover, "Akh Morn Afah (Shiva)", akhMornsAndAfah, On: FruMitigation.Usurper) }),
+        // The full phase presses Feint (Shiva) and the phys ranged Party Mit here and again at the last Akh Morn Afah, at least 90 s later.
+        new(D1, Feint, cover, "Akh Morn Afah (Shiva)", akhMornsAndAfah, On: FruMitigation.Usurper),
+        .. (withMornAfah ? new MitPlanEntry[] { new(D3, PartyMit, cover, "Akh Morn Afah", akhMornsAndAfah) } : Array.Empty<MitPlanEntry>()),
         .. (mornAfahAt is { } afah
             ? new MitPlanEntry[] { new(SCH, Concitation, afah - MornAfahDamageDelay - ShieldLead, "Morn Afah (shielded again after the Akh Morns)", [afah]),
                new(SGE, EukrasianPrognosisII, afah - MornAfahDamageDelay - ShieldLead, "Morn Afah (shielded again after the Akh Morns)", [afah]) }

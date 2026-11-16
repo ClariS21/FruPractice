@@ -120,11 +120,12 @@ public sealed class SimPartyNpc : SimNpc, ISimPartyMember
         JobActions.ApplyEffects(this, actionId, (ulong)(target ?? this).GameObjectId, actionRng().Source);
     }
 
-    // level 1-3. The action id used; 0 if KO'd, mitigation is not required, or the job has no limit
-    // break at that level. Bots press their own limit break only while mitigation is required.
+    // level 1-3. The action id used; 0 if KO'd, actions are locked, or the job has no limit break at
+    // that level. Bots press their limit break whenever a script calls for it, whatever the
+    // mitigation settings: a real tank always LB3s Pandora's Box.
     internal uint UseLimitBreak(int level)
     {
-        if (!this.IsAlive() || ActionsLocked || !Mitigation.Required) return 0;
+        if (!this.IsAlive() || ActionsLocked) return 0;
         var actionId = LimitBreakHandler.ActionId(ClassJob, level);
         if (actionId == 0) return 0;
         UseAction(actionId);

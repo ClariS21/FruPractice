@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using AnoMech.Core.Game;
+using AnoMech.Core.Game.Party;
 
 namespace AnoMech.Scenarios.Fru.P5ParadiseRegained;
 
@@ -22,6 +23,8 @@ public sealed class FruP5ParadiseRegainedState
     public int Rotation { get; }
     public bool EastSecond { get; }
     public bool DarkFirst { get; }
+    // The seat whose job takes the first wing's cleave on its invulnerability; the other seat takes the second's.
+    public PartyRole FirstCleaveSeat { get; set; } = PartyRole.MainTank;
 
     public FruP5ParadiseRegainedState(Rng rng, FruP5ParadiseRegainedStateOverrides overrides)
     {

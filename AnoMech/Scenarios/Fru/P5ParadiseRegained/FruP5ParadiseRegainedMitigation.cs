@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using AnoMech.Core.Game.PartyMit;
 using static AnoMech.Core.Game.PartyMit.MitActionId;
 using static AnoMech.Core.Game.PartyMit.SheetColumn;
@@ -41,33 +42,34 @@ internal static class FruP5ParadiseRegainedMitigation
         ],
         [.. (round == 0 ? WingRows() : []), .. PolarizingStrikesRows(round)], FruMitigation.Pandora);
 
-    // The first wing's cleave goes to the main tank and its buster to the off tank; the second's the
-    // other way round. A Warrior takes the first cleave with Holmgang and covers the buster with
-    // Nascent Flash; the other jobs sink the first buster, and take the second cleave on their
-    // invulnerability with their buddy mitigation on the buster.
+    // The sheet's tank tabs give Wings per job, the same in either seat: of a pair, the first of
+    // Warrior, Paladin, Gunbreaker, Dark Knight takes the first wing's cleave on its invulnerability
+    // (its buddy mitigation on the other tank's buster) and kitchen-sinks the second wing's buster;
+    // the other does the reverse. A sink leaves out the buddy buttons the job needs back for its
+    // other wing.
     private static IEnumerable<MitPlanEntry> WingRows()
     {
         foreach (var tank in new[] { MT, OT })
-        {
-            yield return Row(tank, Warrior, Holmgang, Cleave1, "Wings Dark and Light 1");
-            yield return Row(tank, Warrior, NascentFlash, Buster1, "Wings Dark and Light 1", buddy: true);
-            foreach (var sink in KitchenSink(tank, Warrior, Buster2, "Wings Dark and Light 2")) yield return sink;
-
-            foreach (var job in new[] { Paladin, Gunbreaker, DarkKnight })
-            {
-                foreach (var sink in FirstWingSink(tank, job)) yield return sink;
-                yield return Row(tank, job, job switch { Paladin => HallowedGround, Gunbreaker => Superbolide, _ => LivingDead }, Cleave2, "Wings Dark and Light 2");
-                foreach (var buddy in BuddyMit(tank, job, Buster2, "Wings Dark and Light 2")) yield return buddy;
-            }
-        }
+            foreach (var job in FruMitigationRows.TankJobs)
+                foreach (var partner in FruMitigationRows.TankJobs)
+                {
+                    if (partner == job) continue;
+                    var rows = FruP5WingsTankPair.InvulnsFirst(job, partner)
+                        ? Invuln(tank, job, Cleave1, Buster1, "Wings Dark and Light 1").Concat(Sink(tank, job, Buster2, "Wings Dark and Light 2"))
+                        : Sink(tank, job, Buster1, "Wings Dark and Light 1").Concat(Invuln(tank, job, Cleave2, Buster2, "Wings Dark and Light 2"));
+                    foreach (var row in rows) yield return row with { Partners = [partner] };
+                }
     }
 
-    // Without the buttons the same job's buddy mitigation for the second wing needs back.
-    private static MitPlanEntry[] FirstWingSink(SheetColumn tank, JobId job) => job switch
+    private static MitPlanEntry[] Invuln(SheetColumn tank, JobId job, float cleave, float buster, string label)
+        => [Row(tank, job, job switch { Warrior => Holmgang, Paladin => HallowedGround, Gunbreaker => Superbolide, _ => LivingDead }, cleave, label),
+            .. BuddyMit(tank, job, buster, label)];
+
+    private static MitPlanEntry[] Sink(SheetColumn tank, JobId job, float buster, string label) => job switch
     {
-        Gunbreaker => Sink(tank, job, Buster1, "Wings Dark and Light 1", MitActionId.Rampart, Camouflage, GreatNebula),
-        DarkKnight => Sink(tank, job, Buster1, "Wings Dark and Light 1", MitActionId.Rampart, ShadowedVigil, DarkMind),
-        _ => KitchenSink(tank, job, Buster1, "Wings Dark and Light 1"),
+        Gunbreaker => FruMitigationRows.Sink(tank, job, buster, label, MitActionId.Rampart, Camouflage, GreatNebula),
+        DarkKnight => FruMitigationRows.Sink(tank, job, buster, label, MitActionId.Rampart, ShadowedVigil, DarkMind),
+        _ => KitchenSink(tank, job, buster, label),
     };
 
     private static IEnumerable<MitPlanEntry> PolarizingStrikesRows(int round)

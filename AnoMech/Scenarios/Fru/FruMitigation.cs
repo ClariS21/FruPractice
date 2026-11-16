@@ -18,6 +18,9 @@ public static class FruMitigation
     public static readonly MitSource Oracle = new("Oracle of Darkness");
     public static readonly MitSource Usurper = new("Usurper of Frost");
     public static readonly MitSource Pandora = new("Pandora");
+    // Not a boss: Edge of Oblivion comes from the Fragment of Fate (93 of 93 hits in public clears), so no boss debuff reduces it.
+    // It is never registered as an actor, so its hits take only the victims' own mitigation.
+    public static readonly MitSource FragmentOfFate = new("Fragment of Fate");
 
     private static MitHitDef Hit(string key, string name, float raw, MitSource source, uint[] ids, DamageKind kind = DamageKind.Magic,
         bool tankBuster = false, float? tankRaw = null, bool targetOnly = false, float? soloRaw = null)
@@ -46,7 +49,7 @@ public static class FruMitigation
 
     public static class P4
     {
-        public static readonly MitHitDef EdgeOfOblivion = Hit("edge_of_oblivion", "Edge of Oblivion", 60000f, Usurper, [ActionId.EdgeOfOblivion]);
+        public static readonly MitHitDef EdgeOfOblivion = Hit("edge_of_oblivion", "Edge of Oblivion", 60000f, FragmentOfFate, [ActionId.EdgeOfOblivion]);
         public static readonly MitHitDef DarklitDragonsong = Hit("darklit_dragonsong", "Darklit Dragonsong", 188000f, Usurper, [ActionId.DarklitDragonsong]);
         public static readonly MitHitDef BrightHunger = Hit("bright_hunger", "Bright Hunger", 45000f, Usurper, [ActionId.BrightHunger]);
         public static readonly MitHitDef PathOfLight = Hit("path_of_light", "The Path of Light", 107000f, Usurper, [ActionId.PathOfLight]);
@@ -58,7 +61,8 @@ public static class FruMitigation
         // UNVERIFIED: a lone tank's share of the Usurper's Akh Morn; clears stack it with three others.
         public static readonly MitHitDef AkhMornUsurper = Hit("akh_morn_usurper", "Akh Morn", 45000f, Usurper, [ActionId.AkhMornUsurperHit], tankRaw: 42000f, soloRaw: 90000f);
         public static readonly MitHitDef AkhMornOracle = Hit("akh_morn_oracle", "Akh Morn", 45000f, Oracle, [ActionId.AkhMornOracleHit], tankRaw: 42000f);
-        public static readonly MitHitDef MornAfah = Hit("morn_afah", "Morn Afah", 176000f, Oracle, [ActionId.MornAfah]);
+        // The Usurper of Frost in 46 of 46 public hits, though the sim has the Oracle cast it.
+        public static readonly MitHitDef MornAfah = Hit("morn_afah", "Morn Afah", 176000f, Usurper, [ActionId.MornAfah]);
         // UNVERIFIED: the Oracle's party-wide hit; no clear reports it.
         public static readonly MitHitDef CrystallizeTime = Hit("crystallize_time", "Crystallize Time", 108000f, Oracle, [ActionId.CrystallizeTimeOracle]);
         public static readonly MitHitDef DarkAero = Hit("dark_aero", "Dark Aero III", 26000f, Oracle, [ActionId.DarkAero]);

@@ -18,24 +18,61 @@ public sealed class FruP5ParadiseRegainedAi : IScenarioAi<FruP5ParadiseRegainedS
     {
         state = stateParam;
         var ai = new AiManager(world);
-        ai.Move(2f, () => ByRole(StackUnderFirstTower), jitter: 0f, arrivalTime: 8.3f, stagingMove: true);
-        ai.Move(10f, () => ByRole(role => state.Rotate(FirstWingSpot(role))), jitter: 0f, arrivalTime: TowerHitAt(0));
-        ai.Move(16.5f, () => ByRole(role => state.Rotate(SecondWingSpot(role))), jitter: 0f, arrivalTime: TowerHitAt(1));
-        ai.Move(25.5f, () => ByRole(PolarizingPreposition), jitter: 0f, arrivalTime: 30f);
-        ai.Move(30f, () => ByRole(role => LineSpot(role, 0, dodged: false)), jitter: 0f, arrivalTime: LinesAimedAt(0));
+        // Human-like layer, as in Fulgent Blade: every seat stands a little off its spot, drifts while
+        // it holds, and leaves a shared move one after another (tanks first). AiManager still makes
+        // each of them arrive at least 0.8 s early.
+        var rng = world.Stream("p5-paradise-movement");
+        var offsets = Enumerable.Range(0, 8).Select(_ => Offset(0.3f + rng.NextSingle() * 0.3f, rng.NextSingle())).ToArray();
+        Vector3[] Drift() => Enumerable.Range(0, 8).Select(_ => Offset(0.1f + rng.NextSingle() * 0.2f, rng.NextSingle())).ToArray();
+        float[] Delays() => Enumerable.Range(0, 8).Select(i => ((PartyRole)i).IsTank()
+            ? rng.NextSingle() * 0.3f : 0.5f + rng.NextSingle() * 1f).ToArray();
+        Func<IAiMove> At(Func<PartyRole, Vector3?> spot, Vector3[]? drift = null)
+            => () => ByRole(role => spot(role) is { } p ? p + offsets[(int)role] + (drift?[(int)role] ?? Vector3.Zero) : null);
+        var firstDelays = Delays();
+        ai.Move(2f, At(StackUnderFirstTower), jitter: 0f, arrivalTime: 8.3f, stagingMove: true);
+        var hold = Drift();
+        ai.Move(8.6f, At(StackUnderFirstTower, hold), jitter: 0f, arrivalTime: 9.4f, departureDelay: _ => 0f);
+        ai.Move(10f, At(role => state.Rotate(FirstWingSpot(role))), jitter: 0f, arrivalTime: TowerHitAt(0),
+            departureDelay: role => firstDelays[(int)role]);
+        var secondDelays = Delays();
+        ai.Move(16.5f, At(role => state.Rotate(SecondWingSpot(role))), jitter: 0f, arrivalTime: TowerHitAt(1),
+            departureDelay: role => secondDelays[(int)role]);
+        var settle = Drift();
+        ai.Move(TowerHitAt(1) + 0.4f, At(role => state.Rotate(SecondWingSpot(role)), settle), jitter: 0f, arrivalTime: TowerHitAt(1) + 1.4f, departureDelay: _ => 0f);
+        // Polarizing Strikes: the same layer, with smaller offsets so a bait's side and depth, which the
+        // lines are aimed by, never change.
+        var lineOffsets = Enumerable.Range(0, 8).Select(_ => Offset(0.15f + rng.NextSingle() * 0.15f, rng.NextSingle())).ToArray();
+        Func<IAiMove> Lines(Func<PartyRole, Vector3?> spot)
+            => () => ByRole(role => spot(role) is { } p ? p + lineOffsets[(int)role] : null);
+        var prepositionDelays = Delays();
+        ai.Move(25.5f, Lines(PolarizingPreposition), jitter: 0f, arrivalTime: 30f, departureDelay: role => prepositionDelays[(int)role]);
+        var firstLinesDelays = Delays();
+        ai.Move(30f, Lines(role => LineSpot(role, 0, dodged: false)), jitter: 0f, arrivalTime: LinesAimedAt(0),
+            departureDelay: role => firstLinesDelays[(int)role]);
         for (var round = 0; round < 4; round++)
         {
             var r = round;
-            if (r > 0) ai.Move(LinesAt(r) - 1.4f, () => ByRole(role => LineSpot(role, r, dodged: false)), jitter: 0f, arrivalTime: LinesAimedAt(r));
-            ai.Move(LinesAt(r) + 1.2f, () => ByRole(role => LineSpot(role, r, dodged: true)), jitter: 0f, arrivalTime: EchoAt(r));
+            var gatherDelays = Delays();
+            var dodgeDelays = Delays();
+            if (r > 0) ai.Move(LinesAt(r) - 1.4f, Lines(role => LineSpot(role, r, dodged: false)), jitter: 0f, arrivalTime: LinesAimedAt(r),
+                departureDelay: role => gatherDelays[(int)role]);
+            ai.Move(LinesAt(r) + 1.2f, Lines(role => LineSpot(role, r, dodged: true)), jitter: 0f, arrivalTime: EchoAt(r),
+                departureDelay: role => dodgeDelays[(int)role]);
         }
     }
+
+    private static Vector3 Offset(float radius, float angle)
+        => new(radius * MathF.Cos(angle * 2f * MathF.PI), 0f, radius * MathF.Sin(angle * 2f * MathF.PI));
 
     private static float LinesAimedAt(int round) => LinesAt(round) - 0.1f;
 
     private Vector3? StackUnderFirstTower(PartyRole role) => state.Rotate(new Vector3(((int)role - 3.5f) * 0.35f, 0f, 7f));
 
-    private Vector3 FirstWingSpot(PartyRole role) => role switch
+    // The tank who takes the first wing's cleave stands where the main tank's spots are; the other tank where the off tank's are.
+    private PartyRole Logical(PartyRole role)
+        => role is PartyRole.MainTank or PartyRole.OffTank ? role == state.FirstCleaveSeat ? PartyRole.MainTank : PartyRole.OffTank : role;
+
+    private Vector3 FirstWingSpot(PartyRole role) => Logical(role) switch
     {
         PartyRole.MainTank => new(state.DarkFirst ? -6.0622f : 6.0622f, 0f, -3.5f),
         PartyRole.OffTank => state.DarkFirst ? new(0f, 0f, 1f) : new(10f, 0f, 10f),
@@ -47,7 +84,7 @@ public sealed class FruP5ParadiseRegainedAi : IScenarioAi<FruP5ParadiseRegainedS
         _ => new(3.8f, 0f, 9.7f),
     };
 
-    private Vector3 SecondWingSpot(PartyRole role) => role switch
+    private Vector3 SecondWingSpot(PartyRole role) => Logical(role) switch
     {
         PartyRole.MainTank => new(0f, 0f, state.DarkFirst ? -14f : -1f),
         PartyRole.OffTank => new(state.DarkFirst ? -6.0622f : 6.0622f, 0f, 3.5f),
