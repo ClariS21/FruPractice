@@ -56,6 +56,8 @@ public class ScenarioCatalogTests
     // Paste the replay line of a failing seed here to debug it.
     [Explicit]
     [TestCase(typeof(global::AnoMech.Scenarios.Fru.P3UltimateRelativity.FruP3UltimateRelativityScenario), 0, 285776436)]
+    [TestCase(typeof(global::AnoMech.Scenarios.Fru.P4CrystallizeTime.FruP4CrystallizeTimeScenario), 0, 1428128475)]
+    [TestCase(typeof(global::AnoMech.Scenarios.Fru.P4Full.FruP4FullScenario), 0, 1492080477)]
     public void Replay(Type scenarioType, int strat, int seed)
     {
         var run = ScenarioRun.Execute(scenarioType, strat, seed, new ScenarioRunOptions { AlwaysWriteArtifacts = true });

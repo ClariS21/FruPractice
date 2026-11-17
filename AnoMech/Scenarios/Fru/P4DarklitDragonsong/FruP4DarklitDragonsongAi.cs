@@ -16,6 +16,20 @@ public sealed class FruP4DarklitDragonsongAi(bool playerBaitsSomberDance) : ISce
     public string Group => "NA";
 
     private const float S = 1f / 2.358f;
+    private const float AkhRhaiAt = 6.6f;
+    private const float AkhRhaiSnapshotAt = 8.8f;
+    private const float LastAkhRhaiAt = 14.5f;
+    private const float SwapAt = 28.2f;
+    private const float PathOfLightAimedAt = 33f;
+    private const float PathOfLightAt = 33.1f;
+    private const float SpiritTakerAt = 35.6f;
+    private const float HallowedWingsAt = 40f;
+    private const float SomberDanceFarAt = 43.8f;
+    private const float OracleLandsAt = 45f;
+    private const float SomberDanceNearAt = 47f;
+    private const float AkhMornAt = 57.7f;
+    // Akh Rhai drops a puddle on every spot of the middle stack: clear of its own and its neighbours'.
+    private const float AkhRhaiClearance = 5.5f;
 
     private FruP4DarklitDragonsongState state = null!;
     private SimWorld world = null!;
@@ -24,7 +38,6 @@ public sealed class FruP4DarklitDragonsongAi(bool playerBaitsSomberDance) : ISce
 
     // The tank who takes Somber Dance this run.
     internal PartyRole SomberTank => somberTank;
-    private bool baitEast;
 
     public void Run(FruP4DarklitDragonsongState stateParam, SimWorld worldParam)
     {
@@ -33,18 +46,22 @@ public sealed class FruP4DarklitDragonsongAi(bool playerBaitsSomberDance) : ISce
         swapped = SwapFreeWaterToItsGroup();
         somberTank = ChooseSomberTank();
         var ai = new AiManager(world);
-        ai.Move(2f, () => ByRole(Middle), arrivalTime: 6.6f, stagingMove: true);
-        ai.Move(6.65f, () => ByRole(OpeningSpread), arrivalTime: 8.8f);
-        ai.Move(14.5f, () => ByRole(Lineup), arrivalTime: 24.2f);
-        ai.Move(24.2f, () => ByRole(role => Bowtie(role, state.LineupOrder.ToArray())), arrivalTime: 28.2f);
-        ai.Move(28.2f, () => ByRole(role => Bowtie(role, swapped)), jitter: 0.3f, arrivalTime: TowersAt);
-        ai.Move(33.1f, () => ByRole(SpiritTakerSpread), arrivalTime: 35.6f);
-        ai.Move(35.65f, () => ByRole(WaterStack), arrivalTime: 40f);
-        world.Events.Add(40.5f, BaitSomberDanceAwayFromOracle);
-        ai.Move(40.6f, () => ByRole(role => role == somberTank ? FromSim(0, baitEast ? 43 : -43) : null), arrivalTime: 43.8f);
-        ai.Move(42.4f, () => ByRole(role => role == somberTank ? null : DanceParty(role)), arrivalTime: 43.8f);
-        ai.Move(45f, () => ByRole(role => role == somberTank ? JustPastOracleFromCenter() : null), jitter: 0f, arrivalTime: 47f);
-        ai.Move(50.15f, () => ByRole(AkhMorn), arrivalTime: 57.7f);
+        ai.Move(2f, () => ByRole(Middle), arrivalTime: AkhRhaiAt, stagingMove: true, knownAt: 2f);
+        ai.Move(AkhRhaiAt, () => ByRole(OpeningSpread), knownAt: AkhRhaiAt, outBy: AkhRhaiSnapshotAt, exitDistance: AkhRhaiClearance, room: 1f);
+        ai.Move(LastAkhRhaiAt, () => ByRole(Lineup), knownAt: LastAkhRhaiAt, knownBy: CueKind.Resolve, arrivalTime: ChainsAt, room: 1f);
+        ai.Move(ChainsAt, () => ByRole(role => Bowtie(role, state.LineupOrder.ToArray())), knownAt: ChainsAt, knownBy: CueKind.Debuff,
+            arrivalTime: SwapAt, room: 0.5f);
+        ai.Move(SwapAt, () => ByRole(FreeWaterSwap), jitter: 0.3f, knownAt: SwapAt, knownBy: CueKind.Debuff, arrivalTime: PathOfLightAimedAt, room: 0.5f);
+        ai.Move(PathOfLightAt, () => ByRole(SpiritTakerSpread), knownAt: PathOfLightAt, knownBy: CueKind.Resolve, arrivalTime: SpiritTakerAt, room: 1f);
+        ai.Move(SpiritTakerAt, () => ByRole(WaterStack), knownAt: SpiritTakerAt, knownBy: CueKind.Resolve, arrivalTime: HallowedWingsAt, room: 1f);
+        // Explicit timing: this tank holds the Dark Water stack until it resolves, and the 26 y run to the far bait takes
+        // 3.1 s even sprinting, so it leaves the moment the stack resolves and gets there 0.5 s before Somber Dance.
+        ai.Move(DarkWaterAt, () => ByRole(role => role == somberTank ? FarBait() : null), arrivalTime: SomberDanceFarAt, departureDelay: _ => 0f);
+        ai.Move(DarkWaterAt, () => ByRole(role => role == somberTank ? null : DanceParty(role)), knownAt: DarkWaterAt, knownBy: CueKind.Resolve,
+            arrivalTime: SomberDanceFarAt, room: 1f);
+        ai.Move(OracleLandsAt, () => ByRole(role => role == somberTank ? JustPastOracleFromCenter() : null), jitter: 0f, knownAt: OracleLandsAt,
+            knownBy: CueKind.Resolve, arrivalTime: SomberDanceNearAt, room: 0.5f);
+        ai.Move(SomberDanceNearAt, () => ByRole(AkhMorn), knownAt: SomberDanceNearAt, knownBy: CueKind.Resolve, arrivalTime: AkhMornAt, room: 1f);
     }
 
     private PartyRole[] SwapFreeWaterToItsGroup()
@@ -73,10 +90,11 @@ public sealed class FruP4DarklitDragonsongAi(bool playerBaitsSomberDance) : ISce
         return oracle.LengthSquared() > 0.01f ? oracle + Vector3.Normalize(oracle) * 2f : oracle;
     }
 
-    private void BaitSomberDanceAwayFromOracle()
+    private Vector3 FarBait()
     {
         var x = OraclePosition().X;
-        baitEast = x < -4f * S || MathF.Abs(x) < 4f * S && state.EastWing;
+        var baitEast = x < -4f * S || MathF.Abs(x) < 4f * S && state.EastWing;
+        return FromSim(0, baitEast ? 43 : -43);
     }
 
     private static Vector3 FromSim(float north, float east) => new(east * S, 0, -north * S);
@@ -118,6 +136,9 @@ public sealed class FruP4DarklitDragonsongAi(bool playerBaitsSomberDance) : ISce
         var index = Array.IndexOf(order, role);
         return index < 4 ? Quadrant(index, 19, 5.2f) : Quadrant(index, 6.7f, 14.6f);
     }
+
+    private Vector3? FreeWaterSwap(PartyRole role)
+        => Array.IndexOf(swapped, role) == state.LineupOrder.ToList().IndexOf(role) ? null : Bowtie(role, swapped);
 
     private Vector3? SpiritTakerSpread(PartyRole role)
     {
