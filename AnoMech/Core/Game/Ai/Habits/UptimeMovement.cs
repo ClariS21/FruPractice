@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.SimObjects;
 using AnoMech.Scenarios;
@@ -60,19 +61,24 @@ internal sealed class UptimeMovement(SimWorld world)
     internal event Action<UptimeMove>? Issued;
 
     private readonly List<(float From, float To, float MaxDistance)> windows = [];
+    internal IReadOnlyList<(float From, float To, float MaxDistance)> Windows => windows;
 
     // Declares a stretch of scenario time [from, to] where uptime may run, with its moves kept within
     // maxDistance of the strat spot (never more than Bound). Outside declared windows uptime is inert:
     // bots stand on their strat spots while hazards are live.
     internal void Allow(float from, float to, float maxDistance = Bound) => windows.Add((from, to, maxDistance));
 
-    private bool TryWindow(float now, out float maxDistance)
+    private bool TryWindow(float now, out float maxDistance) => TryWindow(now, out maxDistance, out _);
+
+    private bool TryWindow(float now, out float maxDistance, out float endsAt)
     {
         maxDistance = 0f;
+        endsAt = now;
         var found = false;
         foreach (var (from, to, max) in windows)
         {
             if (now < from || now > to) continue;
+            endsAt = found ? MathF.Max(endsAt, to) : to;
             maxDistance = found ? MathF.Max(maxDistance, max) : max;
             found = true;
         }
@@ -173,10 +179,34 @@ internal sealed class UptimeMovement(SimWorld world)
         var hitbox = boss.HitboxRadius;
         var centre = metrics.CentreDistance.TryGetValue(boss.DisplayName, out var q) ? q.At(seat.CentreQuantile) : hitbox + MeleeAimDefault;
         centre = Math.Clamp(centre, hitbox + MeleeAimMin, hitbox + MeleeAimMax);
-        var bearing = boss.Rotation + seat.Side * Flank + (seat.Side == 0 ? MathF.PI : 0f) + seat.Jitter;
-        var wanted = boss.Position + new Vector3(MathF.Sin(bearing), 0f, MathF.Cos(bearing)) * centre;
-        var spot = Within(anchor + Flat3(wanted - anchor), anchor, MathF.Min(Reach, Limit));
-        spot.Y = anchor.Y;
+        Vector3 SpotFor(int side)
+        {
+            var bearing = boss.Rotation + side * Flank + (side == 0 ? MathF.PI : 0f) + seat.Jitter;
+            var wanted = boss.Position + new Vector3(MathF.Sin(bearing), 0f, MathF.Cos(bearing)) * centre;
+            var s = Within(anchor + Flat3(wanted - anchor), anchor, MathF.Min(Reach, Limit));
+            s.Y = anchor.Y;
+            return s;
+        }
+        var spot = SpotFor(seat.Side);
+        if (!Safe(spot, now, due))
+        {
+            // The preferred spot is under a hazard: the other sides of the boss, or none.
+            var found = false;
+            foreach (var side in new[] { 0, 1, -1 })
+            {
+                if (side == seat.Side) continue;
+                var other = SpotFor(side);
+                if (Flat(other, boss.Position) > hitbox + MeleeAimMax + 0.05f || !Safe(other, now, due)) continue;
+                spot = other;
+                found = true;
+                break;
+            }
+            if (!found)
+            {
+                seat.NextAt = now + 0.5f;
+                return;
+            }
+        }
         if (Flat(spot, boss.Position) > hitbox + MeleeAimMax + 0.05f) return;
         var walk = Flat(bot.Position, spot);
         var outOfReach = Flat(bot.Position, boss.Position) > hitbox + MeleeReach - 0.2f;
@@ -189,11 +219,19 @@ internal sealed class UptimeMovement(SimWorld world)
         seat.NextAt = now + Wait(rng, seat.Rate);
         var reach = MathF.Min(Reach, Limit);
         var near = MathF.Min(0.8f, reach);
-        var radius = near + (reach - near) * rng.NextSingle();
-        var turn = rng.NextSingle() * MathF.Tau;
-        var spot = anchor + new Vector3(MathF.Cos(turn), 0f, MathF.Sin(turn)) * radius;
-        // A step too small to read as one goes to the other side of the spot.
-        if (Flat(bot.Position, spot) < MinStep) spot = anchor + (anchor - spot);
+        Vector3 spot = default;
+        // Candidates under a hazard are rejected for another; with none safe the move is skipped.
+        var safe = false;
+        for (var attempt = 0; attempt < 6 && !safe; attempt++)
+        {
+            var radius = near + (reach - near) * rng.NextSingle();
+            var turn = rng.NextSingle() * MathF.Tau;
+            spot = anchor + new Vector3(MathF.Cos(turn), 0f, MathF.Sin(turn)) * radius;
+            // A step too small to read as one goes to the other side of the spot.
+            if (Flat(bot.Position, spot) < MinStep) spot = anchor + (anchor - spot);
+            safe = Safe(spot, now, due);
+        }
+        if (!safe) return;
         if (!Issue(seat, role, bot, anchor, spot, due, now)) seat.NextAt = now + 0.5f;
     }
 
@@ -207,6 +245,24 @@ internal sealed class UptimeMovement(SimWorld world)
         var plan = world.Movement.PlanFor(role)!;
         DiagnosticLog.Info($"[Uptime] {role}: ({bot.Position.X:F1},{bot.Position.Z:F1}) -> ({spot.X:F1},{spot.Z:F1}) within {Flat(spot, anchor):F1}y of ({anchor.X:F1},{anchor.Z:F1}), settling at ({plan.Target.X:F1},{plan.Target.Z:F1}), room {room:F1}.");
         Issued?.Invoke(new UptimeMove(role, now, anchor, spot, plan.Target, room, due));
+        return true;
+    }
+
+    // Hazards cover a destination plus this much around it.
+    internal const float HazardMargin = 1f;
+    private const float HazardLookahead = 30f;
+
+    // False when a hazard of the active scenario covers `spot` (with the margin) at any firing between
+    // now and the earlier of the window's end and the strat's next departure. No source, no rejection.
+    private bool Safe(Vector3 spot, float now, float? due)
+    {
+        if (world.HazardSource is not { } source) return true;
+        TryWindow(now, out _, out var endsAt);
+        var until = due is { } d ? MathF.Min(endsAt, d) : endsAt;
+        if (until < now) until = now;
+        var point = new Vector2(spot.X, spot.Z);
+        foreach (var hazard in source.Upcoming(now, MathF.Min(until - now, HazardLookahead)))
+            if (hazard.FiresAt >= now && hazard.FiresAt <= until && hazard.Shape.SignedDistance(point) <= HazardMargin) return false;
         return true;
     }
 

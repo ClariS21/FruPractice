@@ -63,7 +63,7 @@ public sealed class FruP3ApocalypseScenario : IScenario, IGuidanceHazardSource
     {
         world = worldParam;
         state = stateParam;
-        guidanceHazards = new ApocalypseHazards(state, world.Events.Elapsed);
+        guidanceHazards = new ApocalypseHazards(state, world.Events.Elapsed, world);
         if (selectedAi is { } idx && idx < AiStrats.Count)
             ((IScenarioAi<FruP3ApocalypseState>)AiStrats[idx]).Run(state, world);
 

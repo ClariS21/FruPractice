@@ -1,12 +1,36 @@
+using System.Reflection;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Game.Party;
+using AnoMech.Scenarios;
 using AnoMech.Scenarios.Fru.P3Apocalypse;
 
 namespace AnoMech.Tests;
 
 public class GuidanceRunTests
 {
+    private static IEnumerable<Type> HazardScenarios()
+        => ScenarioCatalog.Create().Scenarios.OfType<IGuidanceHazardSource>().Select(s => s.GetType());
+
+    [TestCaseSource(nameof(HazardScenarios))]
+    public void GuidanceHazardSetStaysBounded(Type scenario)
+    {
+        HashSet<GuidanceHazard>? retained = null;
+        var run = ScenarioRun.Execute(scenario, 0, 1, new ScenarioRunOptions
+        {
+            Configure = c => c.PathGuidance = PathGuidance.FullGuide,
+            WriteArtifactsOnFailure = false,
+            Probe = p => retained ??= (HashSet<GuidanceHazard>)typeof(GuidanceRun)
+                .GetField("hazards", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(p.Game.Guidance)!,
+        });
+        Assert.That(run.Passed, run.ToString());
+        Assert.That(retained, Is.Not.Null);
+        TestContext.Progress.WriteLine($"{scenario.Name}: {retained!.Count} retained hazards");
+        var topLabels = string.Join(", ", retained.GroupBy(h => h.Label).OrderByDescending(g => g.Count())
+            .Take(8).Select(g => $"{g.Key}={g.Count()}"));
+        Assert.That(retained.Count, Is.LessThanOrEqualTo(400), topLabels);
+    }
+
     [TestCase(false)]
     [TestCase(true)]
     public void DeathOrClearRetainsDebriefUntilClosed(bool death)

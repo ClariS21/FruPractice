@@ -3,6 +3,9 @@ using AnoMech.Scenarios.Fru.P4Full;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.UserActions;
 using System.Numerics;
+using AnoMech.Core.EnemyActions;
+using AnoMech.Core.Game.PartyHp;
+using AnoMech.Scenarios.Fru;
 
 namespace AnoMech.Tests;
 
@@ -97,10 +100,13 @@ public class FruP4FullScenarioTests
     }
 
     // Real clears (FFLogs): the Morn Afah bar is 5.7 s and its damage lands 7.5 s after it begins; the last Edge of
-    // Oblivion's bar is 4.7 s and its damage lands 5.6 s after it begins; the two damages are 3.0-3.3 s apart.
+    // Oblivion's bar is 4.7 s and its damage lands 5.6 s after it begins; the two damages are 3.0-3.3 s apart. The sim
+    // lands a damage its DamageDelay after the cast snapshots, and each target sees it after its own server tick, a random
+    // 0.05-0.35 s. So the times checked are the scheduled ones, and each impact only has to land within its tick.
     [Test]
     public void TheEdgeAndMornAfahKeepTheirRealBarsAndDamageTimes()
     {
+        const float frame = ScenarioRun.FrameSeconds;
         var path = Path.Combine(Path.GetTempPath(), $"frup4full-{Guid.NewGuid():N}.csv");
         try
         {
@@ -108,26 +114,33 @@ public class FruP4FullScenarioTests
             Assert.That(run.Passed, run.ToString);
             var lines = File.ReadLines(path).Skip(1).ToList();
             List<float> Begins(uint id) => DistinctMoments(lines.Select(ParseRow).Where(r => r.Kind == "cast" && r.ActionId == id).Select(r => r.Time));
-            float FirstDamageAfter(uint id, float begin) => lines.Select(ParseRow).Where(r => r.Kind == "impact" && r.ActionId == id && r.Time > begin && r.Time < begin + 10f).Min(r => r.Time);
+            float FirstImpactAfter(uint id, float time) => lines.Select(ParseRow).Where(r => r.Kind == "impact" && r.ActionId == id && r.Time > time && r.Time < time + 10f).Min(r => r.Time);
             float BarOf(uint id, float begin)
             {
                 var cast = lines.First(line => ParseRow(line) is { Kind: "cast" } r && r.ActionId == id && MathF.Abs(r.Time - begin) < 0.01f);
                 var text = cast.Split(',').First(cell => cell.StartsWith("cast=", StringComparison.Ordinal));
                 return float.Parse(text["cast=".Length..].Split('s')[0], CultureInfo.InvariantCulture);
             }
+            float Damage(EnemyAction action, float begin) => begin + BarOf(action.ActionId, begin) + action.Timing.ResolveSnapshotOffset + action.Timing.DamageDelay;
+            void LandsWithinItsTick(EnemyAction action, float damage, string what)
+                => Assert.That(FirstImpactAfter(action.ActionId, damage - 1f),
+                    Is.InRange(damage + PartyHp.TickDelayMin - frame, damage + PartyHp.TickDelayMax + 3 * frame), $"{what}: the impact");
 
-            var mornAfahs = Begins(40304);
+            var mornAfahs = Begins(FruActions.MornAfah.ActionId);
             Assert.That(mornAfahs, Has.Count.EqualTo(2));
             foreach (var begin in mornAfahs)
             {
-                Assert.That(BarOf(40304, begin), Is.EqualTo(5.7f).Within(0.05f), $"Morn Afah at {begin:F1}: the bar");
-                Assert.That(FirstDamageAfter(40304, begin) - begin, Is.EqualTo(7.5f).Within(0.3f), $"Morn Afah at {begin:F1}: the damage");
+                Assert.That(BarOf(FruActions.MornAfah.ActionId, begin), Is.EqualTo(5.7f).Within(0.05f), $"Morn Afah at {begin:F1}: the bar");
+                var damage = Damage(FruActions.MornAfah, begin);
+                Assert.That(damage - begin, Is.EqualTo(7.5f).Within(0.3f), $"Morn Afah at {begin:F1}: the damage");
+                LandsWithinItsTick(FruActions.MornAfah, damage, $"Morn Afah at {begin:F1}");
             }
-            var edgeBegin = Begins(40174).Last();
-            Assert.That(BarOf(40174, edgeBegin), Is.EqualTo(4.7f).Within(0.05f), "Edge of Oblivion's bar");
-            var edgeDamage = FirstDamageAfter(40174, edgeBegin);
+            var edgeBegin = Begins(FruActions.EdgeOfOblivion.ActionId).Last();
+            Assert.That(BarOf(FruActions.EdgeOfOblivion.ActionId, edgeBegin), Is.EqualTo(4.7f).Within(0.05f), "Edge of Oblivion's bar");
+            var edgeDamage = Damage(FruActions.EdgeOfOblivion, edgeBegin);
             Assert.That(edgeDamage - edgeBegin, Is.EqualTo(5.6f).Within(0.3f), "Edge of Oblivion's damage");
-            Assert.That(FirstDamageAfter(40304, mornAfahs[1]) - edgeDamage, Is.InRange(3.0f, 3.3f), "Edge to Morn Afah");
+            LandsWithinItsTick(FruActions.EdgeOfOblivion, edgeDamage, "Edge of Oblivion");
+            Assert.That(Damage(FruActions.MornAfah, mornAfahs[1]) - edgeDamage, Is.InRange(3.0f, 3.3f), "Edge to Morn Afah");
         }
         finally
         {

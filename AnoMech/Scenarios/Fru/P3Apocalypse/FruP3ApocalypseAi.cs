@@ -44,6 +44,12 @@ public sealed class FruP3ApocalypseAi : IScenarioAi<FruP3ApocalypseState>
         world = worldParam;
         AdjustWaterGroups();
         var ai = new AiManager(world);
+        // Uptime where the party holds still with nothing positional live: on the setup slots before the debuffs
+        // (Spirit Taker, the first circle, is at 24.8 s), and after the last Dark Water, once the Pulsar is the only
+        // thing left. Not on the stacks, nor the spreads: their spots are tight to a 5 to 6 y blast.
+        var start = world.Events.Elapsed;
+        world.Uptime.Allow(start + 5f, start + 11.5f, 2f);
+        world.Uptime.Allow(start + WaterAt(3) + 1.5f, start + 80f, 2f);
         // Every move is scheduled when its spot becomes known (knownAt) and declares the hit it must beat, taken
         // from the scenario's timeline. The human-like layer picks each bot's departure, path and settle spot.
         // (jitter is kept where there was one: it only places the human seat of a test and Last moment bots.)

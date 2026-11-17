@@ -209,24 +209,111 @@ public class UptimeMovementTests
             $"{inReach}/{total} frames in reach; by seat {string.Join(", ", seats.Select(s => $"{s.Key} {s.Value.Reach}/{s.Value.Total}"))}");
     }
 
-    [TestCase(typeof(AnoMech.Scenarios.Fru.P3Apocalypse.FruP3ApocalypseScenario))]
     [TestCase(typeof(AnoMech.Scenarios.Fru.P5ParadiseRegained.FruP5ParadiseRegainedScenario))]
-    public void WithNoDeclaredWindowUptimeNeverMovesAnyone(Type scenario)
+    [TestCase(typeof(AnoMech.Scenarios.Fru.P4CrystallizeTime.FruP4CrystallizeTimeScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Fru.P4Full.FruP4FullScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Fru.P3Apocalypse.FruP3ApocalypseScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Fru.P3UltimateRelativity.FruP3UltimateRelativityScenario))]
+    public void UptimeNeverActsOutsideADeclaredWindow(Type scenario)
     {
-        var issued = 0;
-        var engaged = 0;
+        var issued = new List<UptimeMove>();
+        var engaged = new List<(PartyRole Role, float At, bool FinishingMove)>();
         var hooked = false;
+        var windows = new HashSet<(float From, float To, float MaxDistance)>();
         var run = ScenarioRun.Execute(scenario, 0, 1, new ScenarioRunOptions
         {
             Probe = probe =>
             {
-                if (!hooked) { probe.World.Uptime.Issued += _ => issued++; hooked = true; }
+                foreach (var window in probe.World.Uptime.Windows) windows.Add(window);
+                if (!hooked) { probe.World.Uptime.Issued += issued.Add; hooked = true; }
                 foreach (var role in Enum.GetValues<PartyRole>())
-                    if (probe.World.Uptime.IsEngaged(role)) engaged++;
+                    if (probe.World.Uptime.IsEngaged(role))
+                        engaged.Add((role, probe.World.Events.Elapsed,
+                            probe.World.Movement.PlanFor(role) is { Order.Uptime: true } && !probe.World.Movement.IsSettled(role)));
             }
         });
         Assert.That(run.Passed, run.ToString());
-        Assert.That(issued, Is.Zero, "uptime issued a move with no declared window");
-        Assert.That(engaged, Is.Zero, "uptime engaged a seat with no declared window");
+        Assert.That(windows, Is.Not.Empty, "scenario declared an uptime window");
+        bool InWindow(float at) => windows.Any(w => at >= w.From && at <= w.To);
+        foreach (var move in issued)
+            Assert.That(InWindow(move.At), Is.True, $"{move.Role} issued at {move.At:F2}");
+        foreach (var frame in engaged)
+        {
+            // IsEngaged remains true while an already issued uptime plan is finishing after its window.
+            var finishingEarlierMove = frame.FinishingMove && issued.Any(m => m.Role == frame.Role && m.At <= frame.At && InWindow(m.At));
+            Assert.That(InWindow(frame.At) || finishingEarlierMove, Is.True, $"{frame.Role} engaged at {frame.At:F2}");
+        }
+    }
+
+    [Test]
+    public void WithoutAllowUptimeNeverIssuesOrEngages()
+    {
+        world.Uptime.Clear();
+        new AiManager(world).Move(0f, Ring(4f), knownAt: 0f, room: 0.5f);
+        Step(30f, () =>
+        {
+            foreach (var role in BotSeats)
+                Assert.That(world.Uptime.IsEngaged(role), Is.False, $"{role} at {world.Events.Elapsed:F2}");
+        });
+        Assert.That(moves, Is.Empty);
+    }
+
+    // Circles that are always about to fire.
+    private sealed class FakeHazards(Func<IEnumerable<(Vector2 Centre, float Radius)>> circles) : AnoMech.Core.Game.Guidance.IGuidanceHazardSource
+    {
+        public IEnumerable<AnoMech.Core.Game.Guidance.GuidanceHazard> Upcoming(float now, float horizon)
+            => circles().Select(c => new AnoMech.Core.Game.Guidance.GuidanceHazard(new AnoMech.Core.Game.Guidance.GuidanceShape.Circle(c.Centre, c.Radius), now + 0.5f, "fake"));
+    }
+
+    private static string Describe(IEnumerable<UptimeMove> list)
+        => string.Join(";", list.Select(m => $"{m.Role}@{m.At:F2}->{m.Destination.X:F2},{m.Destination.Z:F2}"));
+
+    [Test]
+    public void UptimeNeverGoesWhereAHazardCoversTheDestination()
+    {
+        new AiManager(world).Move(0f, Ring(4f), knownAt: 0f, room: 0.5f);
+        Step(30f);
+        var melee = moves.Where(m => SimWorld.HabitRoleOf(m.Role) == HabitRole.Melee).ToList();
+        Assert.That(melee, Is.Not.Empty, "melee moved without hazards");
+        var covered = melee.Select(m => new Vector2(m.Destination.X, m.Destination.Z)).Distinct().ToList();
+
+        TearDown();
+        Install(1, Habits());
+        world.HazardSource = new FakeHazards(() => covered.Select(c => (c, 1.5f)));
+        new AiManager(world).Move(0f, Ring(4f), knownAt: 0f, room: 0.5f);
+        Step(30f);
+        foreach (var move in moves)
+            foreach (var c in covered)
+                Assert.That(Vector2.Distance(new Vector2(move.Destination.X, move.Destination.Z), c), Is.GreaterThan(1.5f + UptimeMovement.HazardMargin),
+                    $"{move.Role} at {move.At:F2} went under a hazard");
+    }
+
+    [Test]
+    public void UptimeSkipsTheMoveWhenNothingNearIsSafe()
+    {
+        world.HazardSource = new FakeHazards(() => Enumerable.Range(0, 8).Select(i =>
+        {
+            var angle = i * MathF.Tau / 8f;
+            return (new Vector2(MathF.Sin(angle), MathF.Cos(angle)) * 4f, 6f);
+        }));
+        new AiManager(world).Move(0f, Ring(4f), knownAt: 0f, room: 0.5f);
+        Step(30f);
+        Assert.That(moves, Is.Empty);
+    }
+
+    [Test]
+    public void WithoutAHazardSourceUptimeIsUnchanged()
+    {
+        new AiManager(world).Move(0f, Ring(4f), knownAt: 0f, room: 0.5f);
+        Step(30f);
+        var plain = Describe(moves);
+        Assert.That(plain, Is.Not.Empty);
+
+        TearDown();
+        Install(1, Habits());
+        world.HazardSource = new FakeHazards(() => []);
+        new AiManager(world).Move(0f, Ring(4f), knownAt: 0f, room: 0.5f);
+        Step(30f);
+        Assert.That(Describe(moves), Is.EqualTo(plain), "an empty source changes nothing");
     }
 }

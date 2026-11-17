@@ -113,13 +113,14 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
         world.Events.Add(AkhMornStepAt, MoveEveryBotForAkhMorn);
     }
 
+    // The human's seat reacts too: its MoveTo is inert in game, but the spot goes on its trail for the guide and the death recap.
     public void Tick(FruP4CrystallizeTimeState stateParam, SimWorld worldParam, float delta)
     {
-        foreach (var bot in Bots())
+        foreach (var member in world.Party.ActiveMembers().ToList())
         {
-            var role = ((ISimPartyMember)bot).Role;
-            ReactToClawCaught(bot, role);
-            ReactToFangCleansed(bot, role);
+            var role = ((ISimPartyMember)member).Role;
+            ReactToClawCaught(member, role);
+            ReactToFangCleansed(member, role);
         }
         HeadForPuddlesAsTheyDrop();
     }
@@ -218,8 +219,6 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
 
     private PartyRole RoleOf(CrystallizeTimeAssignment assignment) => assignments.First(a => a.Value == assignment).Key;
 
-    private IEnumerable<SimCharacter> Bots() => world.Party.ActiveMembers().Where(world.Party.IsBotDriven).ToList();
-
     private void Take(Step step)
     {
         foreach (var (assignment, destination) in step.Route.OrderBy(entry => entry.Value.Puddle is null))
@@ -249,17 +248,17 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
             }
     }
 
-    private void ReactToClawCaught(SimCharacter bot, PartyRole role)
+    private void ReactToClawCaught(SimCharacter member, PartyRole role)
     {
-        if (bot.HasStatus(StatusId.Wyrmclaw)) { holdingClaw.Add(role); return; }
+        if (member.HasStatus(StatusId.Wyrmclaw)) { holdingClaw.Add(role); return; }
         if (!holdingClaw.Remove(role) || state.Debuff(role) != CrystallizeDebuff.RedAero) return;
         sentToEarlySoak.Add(role);
         Send(role, EarlySoak[assignments[role]].Position, CueKind.Resolve, TightRoom);
     }
 
-    private void ReactToFangCleansed(SimCharacter bot, PartyRole role)
+    private void ReactToFangCleansed(SimCharacter member, PartyRole role)
     {
-        if (bot.HasStatus(StatusId.Wyrmfang)) { holdingFang.Add(role); return; }
+        if (member.HasStatus(StatusId.Wyrmfang)) { holdingFang.Add(role); return; }
         if (!holdingFang.Remove(role) || Now >= RewindAt) return;
         awaitingPuddle.Remove(role);
         claims.Remove(role);

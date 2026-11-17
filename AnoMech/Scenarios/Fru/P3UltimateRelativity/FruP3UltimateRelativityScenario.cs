@@ -5,6 +5,7 @@ using System.Numerics;
 using AnoMech.Core.EnemyActions;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
+using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
@@ -14,8 +15,11 @@ using Actions = AnoMech.Scenarios.Fru.FruActions;
 
 namespace AnoMech.Scenarios.Fru.P3UltimateRelativity;
 
-public sealed class FruP3UltimateRelativityScenario : IScenario
+public sealed class FruP3UltimateRelativityScenario : IScenario, IGuidanceHazardSource
 {
+    private UltimateRelativityHazards? guidanceHazards;
+    public IEnumerable<GuidanceHazard> Upcoming(float now, float horizon)
+        => guidanceHazards?.Upcoming(now, horizon) ?? [];
     public string Name => "Ultimate Relativity";
     public IPhase Phase => FruZone.P3;
 
@@ -49,6 +53,9 @@ public sealed class FruP3UltimateRelativityScenario : IScenario
         state = stateParam;
         speedTethers.Clear();
         returns.Clear();
+        Array.Clear(laserDirections);
+        guidanceHazards = new UltimateRelativityHazards(state, world, world.Events.Elapsed,
+            clock => laserDirections[clock], role => returns.TryGetValue(role, out var at) ? at : null);
         if (selectedAi is { } idx && idx < AiStrats.Count)
             ((IScenarioAi<FruP3UltimateRelativityState>)AiStrats[idx]).Run(state, world);
 

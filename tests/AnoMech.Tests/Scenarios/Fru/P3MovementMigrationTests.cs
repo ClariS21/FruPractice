@@ -36,7 +36,7 @@ public class P3MovementMigrationTests
         public HabitOrder Order { get; } = order;
         public Vector3 Start { get; } = start;
         public float SeenAt { get; } = seenAt;
-        public bool InChecked, OutChecked;
+        public bool InChecked, OutChecked, Displaced;
     }
 
     private static float Flat(Vector3 a, Vector3 b) => Vector2.Distance(new Vector2(a.X, a.Z), new Vector2(b.X, b.Z));
@@ -59,7 +59,10 @@ public class P3MovementMigrationTests
                     foreach (var role in Enum.GetValues<PartyRole>())
                     {
                         if (role == player || p.Member(role) is not { } member) continue;
-                        if (p.World.Movement.PlanFor(role) is { } plan && !watched.ContainsKey((role, plan.Generation)))
+                        // Uptime moves are judged by the uptime tests, against the next strat move.
+                        if (p.World.Movement.PlanFor(role) is { Order.Uptime: true })
+                            foreach (var w in watched.Where(w => w.Key.Item1 == role)) w.Value.Displaced = true;
+                        if (p.World.Movement.PlanFor(role) is { } plan && !plan.Order.Uptime && !watched.ContainsKey((role, plan.Generation)))
                             watched[(role, plan.Generation)] = new Watched(plan.Order, member.Position, p.Time);
                     }
                     foreach (var ((role, generation), move) in watched)
@@ -78,7 +81,8 @@ public class P3MovementMigrationTests
                             else if (current)
                             {
                                 checkedMoves++;
-                                if (Flat(bot.Position, order.Spot) > order.Room + 0.15f)
+                                // A bot that took uptime steps may stand up to the window's 2 y off its spot.
+                                if (Flat(bot.Position, order.Spot) > order.Room + 0.15f + (move.Displaced ? 2f : 0f))
                                     failures.Add($"{role} is {Flat(bot.Position, order.Spot):F2} y from its spot {Margin:F1} s before its inBy {inBy:F2} (seen {move.SeenAt:F2}, {walk:F1} y)");
                             }
                         }

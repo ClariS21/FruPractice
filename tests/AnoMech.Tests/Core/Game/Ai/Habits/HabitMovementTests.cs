@@ -138,7 +138,8 @@ public class HabitMovementTests
     }
 
     [Test]
-    public void TheSlackShareSpreadsArrivalsAcrossTheSafeWindow()
+    // Full slack use adds at most MaxSlackWait after the reaction; bots no longer idle to the last safe moment.
+    public void TheSlackShareAddsAtMostTheCappedWait()
     {
         var spot = new Vector3(6.5f, 0f, 0f);
         world.MovementHabits = Fixed(reaction: 0.5f, slackUse: 0f);
@@ -152,7 +153,7 @@ public class HabitMovementTests
         Assert.Multiple(() =>
         {
             Assert.That(prompt, Is.EqualTo(1.5f).Within(2 * Frame + 0.001f));
-            Assert.That(late, Is.InRange(8f - Margin - 0.3f, 8f - Margin));
+            Assert.That(late, Is.EqualTo(1.5f + HabitTiming.MaxSlackWait).Within(2 * Frame + 0.001f));
         });
     }
 

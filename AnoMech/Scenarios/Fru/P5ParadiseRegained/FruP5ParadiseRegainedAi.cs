@@ -24,10 +24,18 @@ public sealed class FruP5ParadiseRegainedAi : IScenarioAi<FruP5ParadiseRegainedS
     // Pandora locks onto the wing's bait here, from where the players stand.
     private const float WingBaitLocksAt = 12.4f;
 
+    // Once the last tower has resolved the party waits on its Polarizing Strikes spots, which are on the
+    // lines' paths (baits and their stacks stand in them). Uptime may run only until its moves can no
+    // longer end 3 s before the bait spots are taken exactly at 30.35, so nothing it does is still live
+    // when a line fires at 37.1; bait order is by distance to Pandora, so it stays within 1 y.
+    internal static readonly (float From, float To, float Max)[] UptimeWindows = [(TowerHitAt(2) + 0.65f, 28f, 1f)];
+
     public void Run(FruP5ParadiseRegainedState stateParam, SimWorld world)
     {
         state = stateParam;
         var ai = new AiManager(world);
+        var startedAt = world.Events.Elapsed;
+        foreach (var (from, to, max) in UptimeWindows) world.Uptime.Allow(startedAt + from, startedAt + to, max);
         Func<IAiMove> At(Func<PartyRole, Vector3?> spot) => () => ByRole(spot);
 
         // The strat's spots are exact for whoever the habit layer doesn't drive (LastMoment bots, and the

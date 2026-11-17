@@ -4,6 +4,7 @@ using System.Numerics;
 using AnoMech.Core.EnemyActions;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
+using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
@@ -16,8 +17,10 @@ namespace AnoMech.Scenarios.Fru.P5FulgentBlade;
 // Pandora's exalines: three groups of two seams, each seam splitting into a light and a dark strip
 // telegraphed by its first cast's omen and then rolling on as instant hits from the same helper.
 // Akh Morn closes it on one member of each light party.
-public sealed class FruP5FulgentBladeScenario : IScenario
+public sealed class FruP5FulgentBladeScenario : IScenario, IGuidanceHazardSource
 {
+    private FruP5FulgentBladeHazards? guidanceHazards;
+    public IEnumerable<GuidanceHazard> Upcoming(float now, float horizon) => guidanceHazards?.Upcoming(now, horizon) ?? [];
     public string Name => "Fulgent Blade";
     public IPhase Phase => FruZone.P5;
     public bool SupportsSolo => true;
@@ -57,6 +60,7 @@ public sealed class FruP5FulgentBladeScenario : IScenario
     {
         world = worldParam;
         state = stateParam;
+        guidanceHazards = new FruP5FulgentBladeHazards(state, world.Events.Elapsed);
         var solo = selectedAi is null;
         if (selectedAi is { } idx && idx < AiStrats.Count)
             ((IScenarioAi<FruP5FulgentBladeState>)AiStrats[idx]).Run(state, world);

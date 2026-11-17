@@ -28,12 +28,18 @@ public sealed class FruP5FulgentBladeAi : IScenarioAi<FruP5FulgentBladeState>
     // The scenario picks the Akh Morn targets then, from where everyone stands.
     private const float AkhMornPickAt = 34.05f;
 
+    // Uptime between the opening cast and the first strat move: nothing is live until the first group's
+    // strips fire at 18.25, and the party holds its cast spots until the spot-0 move departs.
+    internal static readonly (float From, float To, float Max)[] UptimeWindows = [(1f, 8.6f, 2.5f)];
+
     public void Run(FruP5FulgentBladeState stateParam, SimWorld world)
     {
         state = stateParam;
         var ai = new AiManager(world);
         // Spot 0 waits out waves 0-1, spot j (1-3) holds waves 2j and 2j+1.
         var spots = PlanSpots(state);
+        var startedAt = world.Events.Elapsed;
+        foreach (var (from, to, max) in UptimeWindows) world.Uptime.Allow(startedAt + from, startedAt + to, max);
 
         // The strat's spots are exact for whoever the habit layer doesn't drive (LastMoment bots, and the
         // human's seat when a test drives it), so those moves say jitter: 0. Habit-timed bots settle

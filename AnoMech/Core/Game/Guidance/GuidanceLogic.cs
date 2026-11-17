@@ -47,18 +47,51 @@ public static class GuidanceLogic
         IEnumerable<GuidanceHazard> hazards, bool following)
     {
         var length = Vector2.Distance(from, to);
-        if (length < 0.001f) return;
+        if (!float.IsFinite(length) || length < 0.001f) return;
         var direction = (to - from) / length;
         foreach (var h in hazards)
         {
             if (h.FiresAt < starts) continue;
-            var predicted = from + direction * Math.Clamp((h.FiresAt - starts) * Speed, 0, length);
-            if (h.Shape.SignedDistance(predicted) > 0 || h.Shape is not GuidanceShape.Circle circle) continue;
-            var along = Vector2.Dot(circle.Center - from, direction);
-            var perpendicularSquared = Vector2.DistanceSquared(circle.Center, from + direction * along);
-            var half = MathF.Sqrt(MathF.Max(0, circle.Radius * circle.Radius - perpendicularSquared));
-            segments.Add(new(from + direction * Math.Clamp(along - half, 0, length),
-                from + direction * Math.Clamp(along + half, 0, length), following));
+            var tp = Math.Clamp((h.FiresAt - starts) * Speed, 0, length);
+            if (!float.IsFinite(tp)) continue;
+            var predicted = from + direction * tp;
+            var signedDistance = h.Shape.SignedDistance(predicted);
+            if (!float.IsFinite(signedDistance) || signedDistance > 0) continue;
+            if (h.Shape is GuidanceShape.Circle circle)
+            {
+                var along = Vector2.Dot(circle.Center - from, direction);
+                var perpendicularSquared = Vector2.DistanceSquared(circle.Center, from + direction * along);
+                var half = MathF.Sqrt(MathF.Max(0, circle.Radius * circle.Radius - perpendicularSquared));
+                segments.Add(new(from + direction * Math.Clamp(along - half, 0, length),
+                    from + direction * Math.Clamp(along + half, 0, length), following));
+                continue;
+            }
+
+            float Boundary(int sign)
+            {
+                var inside = tp;
+                var steps = (int)MathF.Ceiling(length / 0.25f) + 1;
+                for (var step = 0; step < steps; step++)
+                {
+                    var sample = Math.Clamp(inside + sign * 0.25f, 0, length);
+                    if (sample == inside) return inside;
+                    if (h.Shape.SignedDistance(from + direction * sample) > 0)
+                    {
+                        var outside = sample;
+                        for (var i = 0; i < 8; i++)
+                        {
+                            var middle = (inside + outside) / 2;
+                            if (h.Shape.SignedDistance(from + direction * middle) <= 0) inside = middle;
+                            else outside = middle;
+                        }
+                        return (inside + outside) / 2;
+                    }
+                    inside = sample;
+                }
+                return inside;
+            }
+
+            segments.Add(new(from + direction * Boundary(-1), from + direction * Boundary(1), following));
         }
     }
 }

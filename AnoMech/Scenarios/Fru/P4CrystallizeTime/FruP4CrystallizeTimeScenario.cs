@@ -15,7 +15,7 @@ using Actions = AnoMech.Scenarios.Fru.FruActions;
 
 namespace AnoMech.Scenarios.Fru.P4CrystallizeTime;
 
-public sealed class FruP4CrystallizeTimeScenario : IScenario
+public sealed partial class FruP4CrystallizeTimeScenario : IScenario
 {
     public string Name => "Crystallize Time";
     public IPhase Phase => FruZone.P4;
@@ -28,6 +28,16 @@ public sealed class FruP4CrystallizeTimeScenario : IScenario
     public void DrawSettings() => settingsWindow.Draw();
     public object SettingsOverrides => settingsWindow.Overrides;
     private readonly FruP4CrystallizeTimeSettingsWindow settingsWindow = new();
+
+    // Where bots may keep up their damage on their own (uptime): on the Akh Morn stack once the bosses are back, until the
+    // first hit. Nothing positional goes off near it, and they stay within a yalm so the stacks stay whole.
+    internal static readonly (float From, float To, float MaxDistance)[] UptimeWindows = [(64.2f, 68.4f, 1f)];
+
+    private static readonly float[] MaelstromAt = [21.5f, 27f, 31.95f];
+    private const float FireworksAt = 25.9f;
+    private const float FirstTidalLightAt = 29.3f;
+    private const float SecondTidalLightAt = 35.7f;
+    private const float SpiritTakerAt = 48.5f;
 
     private const float PuddleLifetime = 17.8f;
     private const float PuddleGrace = 1f;
@@ -49,7 +59,11 @@ public sealed class FruP4CrystallizeTimeScenario : IScenario
 
     private SimWorld world = null!;
     private FruP4CrystallizeTimeState state = null!;
+    private float startedAt;
     private IScenarioAi<FruP4CrystallizeTimeState>? ai;
+
+    // The run's rolls and live puddles, for tests.
+    internal FruP4CrystallizeTimeState State => state;
     private SimEnemy? usurper, oracle, fragment, edgeHelper;
     private readonly SimEnemy?[] hourglasses = new SimEnemy?[6];
     private readonly SimEnemy?[] dragons = new SimEnemy?[2];
@@ -73,7 +87,11 @@ public sealed class FruP4CrystallizeTimeScenario : IScenario
     {
         world = worldParam;
         state = stateParam;
+        startedAt = world.Events.Elapsed;
+        foreach (var (from, to, maxDistance) in UptimeWindows) world.Uptime.Allow(startedAt + from, startedAt + to, maxDistance);
+        MarkPlayers();
         fragmentBroken = false;
+        Array.Clear(hourglasses);
         Array.Clear(dragons);
         Array.Clear(dragonCatches);
         Array.Clear(lastCatcher);
@@ -115,15 +133,15 @@ public sealed class FruP4CrystallizeTimeScenario : IScenario
         world.Events.Add(19.9f, () => SetHourglassScenery(MapEffect.RelativityHourglassDraining, state.HourglassPair(0)));
         world.Events.Add(20.7f, () => speedTethers.ForEach(t => t.Despawn()));
         world.Events.Add(20.8f, SpeedUpAndSlowDownHourglasses);
-        world.Events.Add(21.5f, () => Maelstrom(0));
+        world.Events.Add(MaelstromAt[0], () => Maelstrom(0));
         world.Events.Add(21.9f, () => SetHourglassScenery(MapEffect.RelativityHourglassDraining, state.HourglassPair(1)));
         world.Events.Add(23.8f, () => SetHourglassScenery(MapEffect.RelativityHourglassDraining, state.HourglassPair(2)));
         world.Events.Add(23.8f, () => oracle?.PlayActionTimeline(TimelineId.OracleHide));
         world.Events.Add(23.9f, () => CastOnHolders(CrystallizeDebuff.BlueWater, Actions.DarkWater));
         world.Events.Add(25.8f, () => usurper?.SetPosition(Vector3.Zero));
         world.Events.Add(25.8f, () => usurper?.PlayActionTimeline(ActionTimelineId.WarpEnd));
-        world.Events.Add(25.9f, Fireworks);
-        world.Events.Add(27f, () => Maelstrom(1));
+        world.Events.Add(FireworksAt, Fireworks);
+        world.Events.Add(MaelstromAt[1], () => Maelstrom(1));
         world.Events.Add(28f, () => TurnToward(usurper, state.WaveOrigin(false, 0)));
         world.Events.Add(28f, () => usurper?.Cast(ActionId.Unnamed, animationLock: 1.1f));
         world.Events.Add(28.7f, () => MoveFacingTravel(usurper, state.WaveOrigin(false, 0)));
@@ -131,15 +149,15 @@ public sealed class FruP4CrystallizeTimeScenario : IScenario
         world.Events.Add(28.8f, () => CastOnHolders(CrystallizeDebuff.BlueDarkness, Actions.UnholyDarkness));
         world.Events.Add(29.2f, () => usurper?.SetRotation(WaveRotation(second: false)));
         world.Events.Add(29.2f, () => world.PlaceGroundVfx(VfxId.TidalLightOrigin, state.WaveOrigin(false, 0)));
-        world.Events.Add(29.3f, () => TidalLight(second: false));
-        world.Events.Add(31.95f, () => Maelstrom(2));
+        world.Events.Add(FirstTidalLightAt, () => TidalLight(second: false));
+        world.Events.Add(MaelstromAt[2], () => Maelstrom(2));
         world.Events.Add(34.4f, () => TurnToward(usurper, state.WaveOrigin(true, 0)));
         world.Events.Add(34.4f, () => usurper?.Cast(ActionId.Unnamed, animationLock: 1.1f));
         world.Events.Add(34.8f, () => usurper?.AddStatus(StatusId.UsurperReturn, 51.8f - 34.8f, sourceObject: tidalHelpers[1]?.GameObjectId ?? default));
         world.Events.Add(35.1f, () => MoveFacingTravel(usurper, state.WaveOrigin(true, 0)));
         world.Events.Add(35.6f, () => usurper?.SetRotation(WaveRotation(second: true)));
         world.Events.Add(35.6f, () => world.PlaceGroundVfx(VfxId.TidalLightOrigin, state.WaveOrigin(true, 0)));
-        world.Events.Add(35.7f, () => TidalLight(second: true));
+        world.Events.Add(SecondTidalLightAt, () => TidalLight(second: true));
         world.Events.Add(42.9f, Quietus);
         world.Events.Add(42.9f, () => oracle?.SetPosition(new Placement(new Vector3(0, 0, 5), 0f)));
         world.Events.Add(43f, () => oracle?.PlayActionTimeline(TimelineId.OracleShow));
@@ -150,7 +168,7 @@ public sealed class FruP4CrystallizeTimeScenario : IScenario
         world.Events.Add(46.9f, () => MoveFacingTravel(usurper, Vector3.Zero));
         world.Events.Add(47.4f, () => usurper?.SetRotation(0f));
         world.Events.Add(47.5f, () => usurper?.Cast(ActionId.HallowedWingsCast, animationLock: 1.4f));
-        world.Events.Add(48.5f, SpiritTaker);
+        world.Events.Add(SpiritTakerAt, SpiritTaker);
         world.Events.Add(StunAt, () => world.Party.ActiveMembers().ToList().ForEach(m => m.AddStatus(StatusId.Stun, StunEndsAt - StunAt)));
         world.Events.Add(52.8f, Rewind);
         world.Events.Add(53.6f, () => PositionUsurperForWaves(second: false));
@@ -409,15 +427,22 @@ public sealed class FruP4CrystallizeTimeScenario : IScenario
     private void TidalLight(bool second)
     {
         usurper?.Cast(ActionId.TidalLightCast, animationLock: 2.1f);
-        var direction = state.WaveDirection(second);
         for (var step = 0; step < 4; step++)
         {
             var helper = tidalHelpers[(second ? 4 : 0) + step];
-            var strip = new Placement(state.WaveOrigin(second, step), MathF.Atan2(direction.X, direction.Z));
+            var strip = Strip(second, step);
             if (step == 0) CastFrom(helper, strip, Actions.TidalLightFirst);
-            else world.Events.Add(1.1f + 2f * step, () => CastFrom(helper, strip, Actions.TidalLightRest));
+            else world.Events.Add(TidalLightStepAfter(step), () => CastFrom(helper, strip, Actions.TidalLightRest));
         }
     }
+
+    private Placement Strip(bool second, int step)
+    {
+        var direction = state.WaveDirection(second);
+        return new Placement(state.WaveOrigin(second, step), MathF.Atan2(direction.X, direction.Z));
+    }
+
+    private static float TidalLightStepAfter(int step) => step == 0 ? 0f : 1.1f + 2f * step;
 
     private static void CastFrom(SimEnemy? helper, Placement at, EnemyAction action)
     {
@@ -486,7 +511,11 @@ public sealed class FruP4CrystallizeTimeScenario : IScenario
         }
     }
 
-    public void OnActionResolved(ActionResolved resolved) => BreakFragmentOnAvoidableHit(resolved);
+    public void OnActionResolved(ActionResolved resolved)
+    {
+        BreakFragmentOnAvoidableHit(resolved);
+        FixMarks(resolved);
+    }
     public void OnStatusLost(StatusLost lost) => KillUncleansed(lost);
 
     public void Tick(float delta, float elapsed)

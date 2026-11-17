@@ -16,7 +16,7 @@ using Actions = AnoMech.Scenarios.Fru.FruActions;
 
 namespace AnoMech.Scenarios.Fru.P4DarklitDragonsong;
 
-public sealed class FruP4DarklitDragonsongScenario : IScenario
+public sealed partial class FruP4DarklitDragonsongScenario : IScenario
 {
     public string Name => "Darklit Dragonsong";
     public IPhase Phase => FruZone.P4;
@@ -41,12 +41,26 @@ public sealed class FruP4DarklitDragonsongScenario : IScenario
     // It takes every one of these and breaks on any other hit.
     private static readonly uint[] FragmentSurvives = [ActionId.DarklitDragonsong, ActionId.HallowedWingsLeft, ActionId.HallowedWingsRight];
 
+    private const float AkhRhaiAt = 6.6f;
+    private const float AkhRhaiRepeatsAt = 9.15f;
+    private const float AkhRhaiRepeatEvery = 0.59f;
+    private const int AkhRhaiRepeats = 10;
+    private const float PathOfLightAimAt = 33f;
+    private const float PathOfLightAt = 33.05f;
+    private const float HallowedWingsAt = 35.3f;
+    private const float SpiritTakerAt = 35.6f;
+
+    // Where bots may keep up their damage on their own (uptime): on the Akh Morn stack, once the dance is done, until the
+    // first hit. Nothing positional goes off near it, and they stay within a yalm so the stacks stay whole.
+    internal static readonly (float From, float To, float MaxDistance)[] UptimeWindows = [(51f, 56.5f, 1f)];
+
     private static readonly Vector3 OracleCenterSpot = new(0, 0, 5);
     private static readonly Vector3 UsurperAkhMornSpot = new(-3.55f, 0, 0);
     private static readonly Vector3 OracleAkhMornSpot = new(3.53f, 0, 0);
 
     private SimWorld world = null!;
     private FruP4DarklitDragonsongState state = null!;
+    private float startedAt;
     private SimEnemy? usurper, oracle, wyrm, fragment, gaia, ryne, edgeHelper;
     private readonly SimEnemy?[] akhRhaiHelpers = new SimEnemy?[8];
     // 0 and 7 take the north and south tower, 2-5 Path of Light; 1 and 6 speak for the Oracle.
@@ -67,6 +81,9 @@ public sealed class FruP4DarklitDragonsongScenario : IScenario
     {
         world = worldParam;
         state = stateParam;
+        startedAt = world.Events.Elapsed;
+        foreach (var (from, to, maxDistance) in UptimeWindows) world.Uptime.Allow(startedAt + from, startedAt + to, maxDistance);
+        MarkSpiritTaker();
         links.Clear();
         fragmentBroken = false;
         towers.Clear();
@@ -95,11 +112,11 @@ public sealed class FruP4DarklitDragonsongScenario : IScenario
         world.Events.Add(1.5f, () => usurper?.SetModelState(4));
         world.Events.Add(1.8f, SpawnGreatWyrm);
         world.Events.Add(2.4f, () => wyrm?.SetTarget(world.Party.Get(PartyRole.OffTank), follow: false));
-        world.Events.Add(6.6f, AkhRhai);
+        world.Events.Add(AkhRhaiAt, AkhRhai);
         world.Events.Add(6.6f, DrachenArmor);
         world.Events.Add(6.6f, EdgeOfOblivion);
-        for (var hit = 0; hit < 10; hit++)
-            world.Events.Add(9.15f + hit * 0.59f, RepeatAkhRhai);
+        for (var hit = 0; hit < AkhRhaiRepeats; hit++)
+            world.Events.Add(AkhRhaiRepeatAt(hit), RepeatAkhRhai);
         world.Events.Add(12.6f, () => oracle?.PlayActionTimeline(TimelineId.OracleShow));
         world.Events.Add(12.6f, () => oracle?.SetTargetable(true));
         world.Events.Add(14.8f, () => usurper?.Cast(ActionId.Unnamed, animationLock: 1.1f));
@@ -127,12 +144,12 @@ public sealed class FruP4DarklitDragonsongScenario : IScenario
         world.Events.Add(29.1f, () => BattleTalk(ryne, 0x8, BNpcNameId.Ryne));
         world.Events.Add(TowersAt, BrightHunger);
         world.Events.Add(32.2f, () => oracle?.Cast(ActionId.SpiritTakerCast, animationLock: 0.2f));
-        world.Events.Add(33f, AimPathOfLight);
-        world.Events.Add(33.05f, PathOfLight);
+        world.Events.Add(PathOfLightAimAt, AimPathOfLight);
+        world.Events.Add(PathOfLightAt, PathOfLight);
         world.Events.Add(35f, () => BattleTalk(gaia, 0x9, BNpcNameId.Gaia));
         world.Events.Add(35.1f, () => MarkWaters(LockonId.WaterCountdown));
-        world.Events.Add(35.3f, HallowedWings);
-        world.Events.Add(35.6f, SpiritTaker);
+        world.Events.Add(HallowedWingsAt, HallowedWings);
+        world.Events.Add(SpiritTakerAt, SpiritTaker);
         world.Events.Add(38.4f, () => oracle?.Cast(ActionId.SomberDanceCast, animationLock: 0.2f));
         world.Events.Add(DarkWaterAt, DarkWater);
         world.Events.Add(43.8f, () => SomberDance(Actions.SomberDanceFar, farthest: true));
@@ -244,6 +261,8 @@ public sealed class FruP4DarklitDragonsongScenario : IScenario
         }
     }
 
+    private static float AkhRhaiRepeatAt(int hit) => AkhRhaiRepeatsAt + hit * AkhRhaiRepeatEvery;
+
     private void RepeatAkhRhai()
     {
         foreach (var helper in akhRhaiHelpers.Take(akhRhaiPuddles))
@@ -327,11 +346,10 @@ public sealed class FruP4DarklitDragonsongScenario : IScenario
 
     // Aimed at a point behind the north-facing Usurper on the wing's side: the sheet's 80y rect runs
     // north from there over that half of the arena.
-    private void HallowedWings()
-    {
-        if (state.EastWing) usurper?.Cast(Actions.HallowedWingsRight, new Vector3(20, 0, 40));
-        else usurper?.Cast(Actions.HallowedWingsLeft, new Vector3(-20, 0, 40));
-    }
+    private void HallowedWings() => usurper?.Cast(Wing, WingAim);
+
+    private EnemyAction Wing => state.EastWing ? Actions.HallowedWingsRight : Actions.HallowedWingsLeft;
+    private Vector3 WingAim => new(state.EastWing ? 20 : -20, 0, 40);
 
     private void SpiritTaker()
     {
@@ -385,6 +403,7 @@ public sealed class FruP4DarklitDragonsongScenario : IScenario
     public void OnActionResolved(ActionResolved resolved)
     {
         BreakFragmentOnAvoidableHit(resolved);
+        spiritTaker?.Resolved(resolved);
         // UNVERIFIED: no pull leaves a Darklit tower unsoaked; Light Rampant's punishment.
         Towers.ResolveTower(world, resolved, ActionId.BrightHunger, Actions.InescapableIllumination, minSoakers: 2);
     }

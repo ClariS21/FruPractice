@@ -151,6 +151,7 @@ public sealed class ScenarioSession
         Natives.Director.Commence();
         // Log-and-rethrow, so the exception reaches our own log too.
         world.SimEvents.Listener = Scenario;
+        world.HazardSource = Scenario as AnoMech.Core.Game.Guidance.IGuidanceHazardSource;
         try
         {
             zone.Run(world);

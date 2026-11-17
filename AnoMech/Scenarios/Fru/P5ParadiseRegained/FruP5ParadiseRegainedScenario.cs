@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
+using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.Map;
@@ -15,8 +16,10 @@ using Actions = AnoMech.Scenarios.Fru.FruActions;
 
 namespace AnoMech.Scenarios.Fru.P5ParadiseRegained;
 
-public sealed class FruP5ParadiseRegainedScenario : IScenario
+public sealed class FruP5ParadiseRegainedScenario : IScenario, IGuidanceHazardSource
 {
+    private FruP5ParadiseRegainedHazards? guidanceHazards;
+    public IEnumerable<GuidanceHazard> Upcoming(float now, float horizon) => guidanceHazards?.Upcoming(now, horizon) ?? [];
     public string Name => "Paradise Regained";
     public IPhase Phase => FruZone.P5;
 
@@ -48,6 +51,8 @@ public sealed class FruP5ParadiseRegainedScenario : IScenario
     {
         world = worldParam;
         state = stateParam;
+        guidanceHazards = new FruP5ParadiseRegainedHazards(world.Events.Elapsed, () => pandora, role => world.Party.Get(role),
+            (round, side) => lineHelpers[round, side], round => linesAimed[round]) { DarkWingFirst = () => state.DarkFirst };
         Array.Clear(towers);
         Array.Clear(linesAimed);
         if (selectedAi is { } idx && idx < AiStrats.Count)

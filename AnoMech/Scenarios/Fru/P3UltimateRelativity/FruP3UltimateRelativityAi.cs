@@ -24,6 +24,7 @@ public sealed class FruP3UltimateRelativityAi : IScenarioAi<FruP3UltimateRelativ
     {
         state = stateParam;
         var ai = new AiManager(world);
+        DeclareUptime(world);
         // Every move is scheduled when its spot becomes known (knownAt), with the hit it must beat declared from
         // the scenario's timeline. The human-like layer picks each bot's departure, path and settle spot.
         // (jitter is kept where there was one: it only places the human seat of a test and Last moment bots.)
@@ -47,6 +48,16 @@ public sealed class FruP3UltimateRelativityAi : IScenarioAi<FruP3UltimateRelativ
         // The stun ends and Shell Crusher's stack goes off: close to the middle, from wherever the rewind left each.
         ai.Move(StunEndAt + 0.1f, () => ByRole(role => Direction(role) * 0.5f), knownAt: StunEndAt + 0.1f, knownBy: CueKind.Resolve,
             room: 1.5f, arrivalTime: 59.2f);
+    }
+
+    // Where the party holds still with nothing positional live (Dark Fire starts at 22.8 s, the lasers at 27.95 s and
+    // sweep until 59.64 s): before the debuffs, and once the lasers and Shell Crusher are over. Bots hold the spots
+    // for 4 s or more there.
+    private static void DeclareUptime(SimWorld world)
+    {
+        var start = world.Events.Elapsed;
+        world.Uptime.Allow(start + 3f, start + 10f, 2f);
+        world.Uptime.Allow(start + 61f, start + 75f, 2f);
     }
 
     // A helper's ability resolves a frame or two after the time it is scheduled at.

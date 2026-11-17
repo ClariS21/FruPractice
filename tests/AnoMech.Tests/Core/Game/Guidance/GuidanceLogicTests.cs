@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Reflection;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
 using AnoMech.Core.Game.Guidance;
@@ -8,6 +9,76 @@ namespace AnoMech.Tests;
 
 public class GuidanceLogicTests
 {
+    private sealed record Box(float Left, float Right, float Bottom, float Top) : GuidanceShape
+    {
+        public override float SignedDistance(Vector2 point)
+            => MathF.Max(MathF.Max(Left - point.X, point.X - Right), MathF.Max(Bottom - point.Y, point.Y - Top));
+    }
+
+    private sealed record Donut(Vector2 Center, float Inner, float Outer) : GuidanceShape
+    {
+        public override float SignedDistance(Vector2 point)
+        {
+            var radius = Vector2.Distance(point, Center);
+            return MathF.Max(Inner - radius, radius - Outer);
+        }
+    }
+
+    private sealed record NaNShape : GuidanceShape
+    {
+        public override float SignedDistance(Vector2 point) => float.NaN;
+    }
+
+    private static List<DangerSegment> SegmentsFor(GuidanceHazard hazard)
+    {
+        var segments = new List<DangerSegment>();
+        typeof(GuidanceLogic).GetMethod("AddDanger", BindingFlags.NonPublic | BindingFlags.Static)!
+            .Invoke(null, [segments, Vector2.Zero, new Vector2(10, 0), 0f, new[] { hazard }, false]);
+        return segments;
+    }
+
+    [Test]
+    public void NaNFiringTimeAddsNoSegmentAndReturns()
+        => Assert.That(SegmentsFor(new(new Box(4, 6, -10, 10), float.NaN, "box")), Is.Empty);
+
+    [Test]
+    public void ShapeThatIsNaNEverywhereAddsNoSegmentAndReturns()
+        => Assert.That(SegmentsFor(new(new NaNShape(), 5f / 6f, "nan")), Is.Empty);
+
+    [Test]
+    public void BoxColorsTheStretchContainingTheSnapshot()
+    {
+        var trail = new StratTrail(new EventScheduler());
+        trail.Record(Spot(10, 0, 0, 10));
+        var box = new Box(4, 6, -10, 10);
+        var guide = GuidanceLogic.Compute(PartyRole.CasterDps, Vector2.Zero, 0, trail, [new(box, 5f / 6f, "box")]);
+        Assert.That(guide.DangerSegments, Has.Count.EqualTo(1));
+        Assert.That(guide.DangerSegments[0].From.X, Is.EqualTo(4).Within(0.05));
+        Assert.That(guide.DangerSegments[0].To.X, Is.EqualTo(6).Within(0.05));
+    }
+
+    [Test]
+    public void BoxDoesNotColorTheWalkWhenSnapshotIsOutside()
+    {
+        var trail = new StratTrail(new EventScheduler());
+        trail.Record(Spot(10, 0, 0, 10));
+        var guide = GuidanceLogic.Compute(PartyRole.CasterDps, Vector2.Zero, 0, trail,
+            [new(new Box(4, 6, -10, 10), 1f / 6f, "box")]);
+        Assert.That(guide.DangerSegments, Is.Empty);
+    }
+
+    [Test]
+    public void DonutColorsOnlyTheStretchContainingTheSnapshot()
+    {
+        var trail = new StratTrail(new EventScheduler());
+        trail.Record(Spot(10, 0, 0, 10));
+        var guide = GuidanceLogic.Compute(PartyRole.CasterDps, new(-10, 0), 0, trail,
+            [new(new Donut(Vector2.Zero, 3, 6), 5.5f / 6f, "donut")]);
+        Assert.That(guide.DangerSegments, Has.Count.EqualTo(1));
+        Assert.That(guide.DangerSegments[0].From.X, Is.EqualTo(-6).Within(0.05));
+        Assert.That(guide.DangerSegments[0].To.X, Is.EqualTo(-3).Within(0.05));
+    }
+
     internal static StratTarget Spot(float x, float z, float issued, float deadline, PartyRole role = PartyRole.CasterDps)
         => new(role, new(x, 0, z), issued, deadline, null, null, null);
 

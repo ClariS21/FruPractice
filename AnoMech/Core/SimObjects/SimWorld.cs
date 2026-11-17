@@ -86,6 +86,9 @@ public sealed class SimWorld : ISimObject, IDisposable
     // What bots do between mechanics, within reach of their strat spot.
     internal UptimeMovement Uptime { get; }
 
+    // The running scenario's hazards, for uptime to keep bots out of them; null when it has none.
+    internal AnoMech.Core.Game.Guidance.IGuidanceHazardSource? HazardSource { get; set; }
+
     // The real player whose habits a bot seat follows this run; null for the human's seat and an
     // empty one. Each seat draws on its own fork, so a seat's profile never depends on which moved first.
     public HabitProfile? HabitFor(PartyRole role)
@@ -306,6 +309,7 @@ public sealed class SimWorld : ISimObject, IDisposable
         Departures.Clear();
         Movement.Clear();
         Uptime.Clear();
+        HazardSource = null;
         Party.EndRun();
     }
 

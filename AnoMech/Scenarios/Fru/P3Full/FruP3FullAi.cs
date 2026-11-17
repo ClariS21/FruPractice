@@ -18,6 +18,9 @@ public sealed class FruP3FullAi
     public void Run(SimWorld world)
     {
         var ai = new AiManager(world);
+        // The row for Black Halo is held from the Pulsar on (Black Halo is a tank buster, nothing positional).
+        var start = world.Events.Elapsed;
+        world.Uptime.Allow(start + 79f, start + 85.5f, 2f);
         // The party takes its Black Halo places once the Pulsar is on its way; nobody but the main tank is hit,
         // so the row is only where to stand; a room of 1 y keeps its 3 y spacing.
         ai.Move(PulsarCastAt, () => ByRole(BlackHaloSpot), knownAt: PulsarCastAt, knownBy: CueKind.Cast, room: 1f,

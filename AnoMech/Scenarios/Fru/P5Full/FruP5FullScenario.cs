@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
+using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
 using AnoMech.Scenarios.Fru.P5FulgentBlade;
@@ -14,8 +15,10 @@ namespace AnoMech.Scenarios.Fru.P5Full;
 // P5 from Pandora's arrival to Paradise Lost: Fulgent Blade three times and Paradise Regained
 // twice, each round its own slice with its own rolls, against one Pandora, with Pandora's Box
 // between the rounds.
-public sealed class FruP5FullScenario : IScenario
+public sealed class FruP5FullScenario : IScenario, IGuidanceHazardSource
 {
+    public IEnumerable<GuidanceHazard> Upcoming(float now, float horizon)
+        => current is IGuidanceHazardSource source ? source.Upcoming(now, horizon) : [];
     public string Name => "Full phase";
     public IPhase Phase => FruZone.P5;
     public bool SupportsMitigationPractice => true;
