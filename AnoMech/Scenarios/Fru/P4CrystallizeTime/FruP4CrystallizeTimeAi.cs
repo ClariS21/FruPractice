@@ -45,8 +45,6 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
     private const float CatchRoom = 0.3f;
     // Some puddles lie a few tenths of a yalm off a Tidal Light strip.
     private const float PuddleRoom = 0f;
-    // Bound for a spot beside a puddle another blue still needs, a bot keeps tight to its line so it can afford to get there after the cleanse.
-    private const float YieldingRoom = 0.1f;
     private const float StackRoom = 1f;
     private const float RewindRoom = 0.3f;
     private const float SpiritTakerRoom = 0.3f;
@@ -54,6 +52,13 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
     private const float AkhMornStackRoom = 1.5f;
     private const float PuddleRush = 0.3f;
     private const float PuddleReach = 1f;
+    private const float PuddleKeepOut = PuddleReach + 0.5f;
+    private const float DetourRoom = 0.2f;
+    private const float DetourSlack = 0.35f;
+    private const float DetourPassing = 2f;
+    private const float PastDetourKeepOut = PuddleReach + HazardMargin + 0.05f;
+    private const int DetourBearings = 24;
+    private static readonly float[] DetourOffsets = [0.4f, 0.8f, 1.4f, 2.2f, 3.2f];
     private const float PlainArrivalMargin = 0.25f;
     private const float HazardMargin = 0.1f;
     private const float FrameReserve = 0.1f;
@@ -75,7 +80,8 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
     private readonly HashSet<PartyRole> holdingClaw = [];
     private readonly HashSet<PartyRole> holdingFang = [];
     private readonly HashSet<PartyRole> sentToEarlySoak = [];
-    private readonly Dictionary<PartyRole, (Vector3 Puddle, float CleansedBy)> claims = new();
+    private readonly HashSet<PartyRole> cleansing = [];
+    private readonly Dictionary<PartyRole, PuddleDetour> detours = new();
     private readonly int[] orders = new int[8];
     private List<Step> steps = [];
     private List<Hazard> hazards = [];
@@ -89,7 +95,9 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
     private sealed record Clearance(float? InBy, float? OutBy, float? Exit, float? HoldUntil, bool WalkingIn);
 
     private sealed record Order(PartyRole Role, Vector3 Spot, CueKind KnownBy, float Room, float? InBy, float? OutBy, Func<Vector3, Vector3, float>? Exit,
-        bool Cleanses, float? GatherUntil, float CueAt);
+        bool Cleanses, float? GatherUntil, float CueAt, bool DetourLeg = false, float KeepOut = PuddleKeepOut);
+
+    private sealed record PuddleDetour(Order Order, int Number, Vector3 Via, IReadOnlyList<PartyRole> Puddles, bool UntilGone);
 
     private float Now => world.Events.Elapsed - startedAt;
 
@@ -102,7 +110,8 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
         holdingClaw.Clear();
         holdingFang.Clear();
         sentToEarlySoak.Clear();
-        claims.Clear();
+        cleansing.Clear();
+        detours.Clear();
         Array.Clear(orders);
         AssignSidesByPriority();
         hazards = Hazards().OrderBy(h => h.At).ToList();
@@ -123,6 +132,7 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
             ReactToFangCleansed(member, role);
         }
         HeadForPuddlesAsTheyDrop();
+        ResumeDetoursPastPuddles();
     }
 
     private IEnumerable<Step> Steps()
@@ -234,6 +244,7 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
             {
                 orders[(int)role]++;
                 awaitingPuddle[role] = source;
+                cleansing.Add(role);
             }
         }
     }
@@ -259,18 +270,22 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
     private void ReactToFangCleansed(SimCharacter member, PartyRole role)
     {
         if (member.HasStatus(StatusId.Wyrmfang)) { holdingFang.Add(role); return; }
-        if (!holdingFang.Remove(role) || Now >= RewindAt) return;
+        if (!holdingFang.Remove(role)) return;
         awaitingPuddle.Remove(role);
-        claims.Remove(role);
+        if (!cleansing.Remove(role) || Now >= RewindAt) return;
         if (AfterCleanse.TryGetValue(assignments[role], out var next)) Send(role, next.Position, CueKind.Debuff, TightRoom);
     }
 
-    private void SendToPuddle(PartyRole role, Vector3 puddle, CueKind knownBy) => Send(role, puddle, knownBy, PuddleRoom, cleanses: true);
+    private void SendToPuddle(PartyRole role, Vector3 puddle, CueKind knownBy)
+    {
+        cleansing.Add(role);
+        Send(role, puddle, knownBy, PuddleRoom, cleanses: true);
+    }
 
     private void Send(PartyRole role, Vector3 spot, CueKind knownBy, float room, float? inBy = null, float? outBy = null,
         Func<Vector3, Vector3, float>? exit = null, bool cleanses = false, float? gatherUntil = null)
     {
-        claims.Remove(role);
+        if (!cleanses) cleansing.Remove(role);
         Issue(new Order(role, spot, knownBy, room, inBy, outBy, exit, cleanses, gatherUntil, Now), ++orders[(int)role], given: true);
     }
 
@@ -284,8 +299,8 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
         var travel = Flat(member.Position, spot);
         // While an order waits, the seat keeps walking its last one: it may set off from that walk's end, as HabitMovement plans.
         var drift = member.MoveDestination is { } heading ? MathF.Max(0f, Flat(heading, spot) - travel) : 0f;
-        var yields = claims.Values.Any(c => Flat(c.Puddle, spot) < PuddleReach + o.Room + HazardMargin);
-        var room = MathF.Max(0f, MathF.Min(MathF.Min(yields ? YieldingRoom : o.Room, RoomClearOfPuddles(member.Position, spot)),
+        var puddles = PuddlesToKeepOutOf(member, o);
+        var room = MathF.Max(0f, MathF.Min(MathF.Min(o.Room, RoomClearOfPuddles(StartsOf(member), spot, puddles)),
             FruConstants.Geometry.ArenaRadius - HazardMargin - MathF.Max(Flat(member.Position, Vector3.Zero), Flat(spot, Vector3.Zero))));
         // The human's seat: the human walks it in game, where its MoveTo is inert, and a stand-in in tests.
         var humanSeat = member is not SimPartyNpc;
@@ -305,22 +320,13 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
         // The human's seat has its spot on the trail as the step gives it, for the path guidance and the death recap: every wait
         // below is the stand-in's alone.
         if (given && humanSeat) world.Strat.Note(role, new Vector2(spot.X, spot.Z), deadline: startedAt + inBy);
+        if (TakeTheWayAroundPuddles(member, o, order, puddles, inBy)) return;
         if (clearance.HoldUntil is { } hold && hold + AfterHit - now > PathSample / Walk)
         {
             world.Events.Add(hold + AfterHit - now, () => Issue(o, order));
             return;
         }
         var leaveBy = Earliest(inBy - arrivalMargin - (travel + drift) / Walk, outBy - arrivalMargin - ((exit ?? travel) + drift) / Walk);
-        float? notBefore = null;
-        foreach (var claim in claims.Values)
-            if (FirstNearer(member.Position, spot, p => PuddleReach + room + HazardMargin - Flat(p, claim.Puddle), 0f) is { } nearPuddle)
-                notBefore = MathF.Max(notBefore ?? float.NegativeInfinity, claim.CleansedBy + (travel - nearPuddle) / Walk);
-        if (notBefore is { } stepIn && leaveBy is { } danger) notBefore = danger <= now ? null : MathF.Min(stepIn, danger + travel / Walk);
-        if (!habitTimed && notBefore - travel / Walk - now is > PathSample / Walk and var stepInLater)
-        {
-            world.Events.Add(stepInLater, () => Issue(o, order));
-            return;
-        }
         if (o.GatherUntil is { } gather && MathF.Min(gather, leaveBy ?? gather) - now is > PathSample / Walk and var gathering)
         {
             world.Events.Add(gathering, () => Issue(o, order));
@@ -335,7 +341,6 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
             }
             (outBy, exit) = (null, null);
         }
-        if (o.Cleanses && inBy is { } cleansedBy) claims[role] = (spot, cleansedBy - arrivalMargin);
         if (humanSeat)
         {
             WalkTheHumanSeat(member, role, spot, inBy, now, drift, order);
@@ -343,7 +348,7 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
         }
         // A plain bot sets off now: its wait is over, and a delayed legacy move would keep it on its last walk meanwhile.
         new AiManager(world).Move(0f, () => AiMove.Single(role, new Vector2(spot.X, spot.Z)), jitter: 0f, knownAt: o.CueAt - now, knownBy: o.KnownBy,
-            room: room, arrivalTime: inBy - now, outBy: outBy - now, exitDistance: exit, notBefore: notBefore - now,
+            room: room, arrivalTime: inBy - now, outBy: outBy - now, exitDistance: exit,
             departureDelay: habitTimed ? null : _ => 0f);
     }
 
@@ -365,15 +370,132 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
         });
     }
 
-    private float RoomClearOfPuddles(Vector3 from, Vector3 to)
+    private static float RoomClearOfPuddles(IReadOnlyList<Vector3> starts, Vector3 to, IReadOnlyList<(PartyRole Catcher, Vector3 At)> puddles)
     {
         var room = float.PositiveInfinity;
-        foreach (var puddle in state.DragonPuddles.Values)
-        {
-            var miss = DistanceToPath(puddle, from, to) - PuddleReach - HazardMargin;
-            if (miss > 0f) room = MathF.Min(room, miss / 2f);
-        }
+        foreach (var (_, puddle) in puddles)
+            foreach (var from in starts)
+            {
+                var miss = DistanceToPath(puddle, from, to) - PuddleReach - HazardMargin;
+                if (miss > 0f) room = MathF.Min(room, miss / 2f);
+            }
         return room;
+    }
+
+    private List<(PartyRole Catcher, Vector3 At)> PuddlesToKeepOutOf(SimCharacter member, Order o)
+        => state.DragonPuddles
+            .Where(p => p.Key != o.Role && !(o.Cleanses && member.HasStatus(StatusId.Wyrmfang) && Flat(p.Value, o.Spot) < 0.01f))
+            .Select(p => (p.Key, p.Value))
+            .ToList();
+
+    private static IReadOnlyList<Vector3> StartsOf(SimCharacter member)
+        => member.MoveDestination is { } heading ? [member.Position, heading] : [member.Position];
+
+    private bool TakeTheWayAroundPuddles(SimCharacter member, Order o, int order, IReadOnlyList<(PartyRole Catcher, Vector3 At)> puddles, float? inBy)
+    {
+        if (o.DetourLeg || puddles.Count == 0) return false;
+        var starts = StartsOf(member);
+        var all = puddles.Select(p => p.At).ToList();
+        var under = puddles.Where(p => Flat(o.Spot, p.At) < PuddleKeepOut).ToList();
+        var target = under.Count == 0 ? o.Spot : BesidePuddles(o.Spot, member.Position, all);
+        var crossed = puddles.Where(p => !SweepClear(starts, target, p.At, o.KeepOut)).ToList();
+        if (under.Count == 0 && crossed.Count == 0) return false;
+        var blocking = under.Concat(crossed).Select(p => p.Catcher).Distinct().ToList();
+        var around = crossed.Select(p => p.At).ToList();
+        if (crossed.Count > 0 && (WayAround(starts, target, all, around, ClearOfComingHazards) ?? WayAround(starts, target, all, around, _ => true)) is { } via)
+        {
+            detours[o.Role] = new(o, order, via, blocking, UntilGone: false);
+            Issue(o with { Spot = via, Room = DetourRoom, InBy = inBy - Flat(via, target) / Walk, Exit = null, Cleanses = false, DetourLeg = true }, order);
+            return true;
+        }
+        var wait = crossed.Count > 0 ? ShortOfPuddles(member.Position, target, all) : target;
+        detours[o.Role] = new(o, order, wait, blocking, UntilGone: true);
+        Issue(o with { Spot = wait, Room = DetourRoom, Exit = null, Cleanses = false, DetourLeg = true }, order);
+        return true;
+    }
+
+    private void ResumeDetoursPastPuddles()
+    {
+        foreach (var (role, detour) in detours.ToList())
+        {
+            if (orders[(int)role] != detour.Number || world.Party.Get(role) is not { } member || !member.IsAlive())
+            {
+                detours.Remove(role);
+                continue;
+            }
+            if (detour.UntilGone ? detour.Puddles.All(state.DragonPuddles.ContainsKey) : Flat(member.Position, detour.Via) > DetourSlack) continue;
+            detours.Remove(role);
+            Issue(detour.UntilGone ? detour.Order : detour.Order with { KeepOut = PastDetourKeepOut }, ++orders[(int)role]);
+        }
+    }
+
+    private static Vector3 BesidePuddles(Vector3 spot, Vector3 from, IReadOnlyList<Vector3> puddles)
+    {
+        var beside = spot;
+        for (var pass = 0; pass < 3; pass++)
+            foreach (var puddle in puddles)
+            {
+                var away = new Vector2(beside.X - puddle.X, beside.Z - puddle.Z);
+                if (away.Length() >= PuddleKeepOut + DetourRoom) continue;
+                if (away.LengthSquared() < 1e-4f) away = new Vector2(from.X - puddle.X, from.Z - puddle.Z);
+                if (away.LengthSquared() < 1e-4f) away = -Vector2.Normalize(new Vector2(puddle.X, puddle.Z) + Vector2.UnitY * 1e-3f);
+                away = Vector2.Normalize(away) * (PuddleKeepOut + DetourRoom + 0.05f);
+                beside = new Vector3(puddle.X + away.X, spot.Y, puddle.Z + away.Y);
+            }
+        return beside;
+    }
+
+    private static Vector3? WayAround(IReadOnlyList<Vector3> starts, Vector3 to, IReadOnlyList<Vector3> puddles, IEnumerable<Vector3> around,
+        Func<(Vector3 Via, float Length), bool> safe)
+    {
+        Vector3? best = null;
+        var shortest = float.PositiveInfinity;
+        foreach (var centre in around)
+            foreach (var offset in DetourOffsets)
+                for (var bearing = 0; bearing < DetourBearings; bearing++)
+                {
+                    var angle = bearing * MathF.Tau / DetourBearings;
+                    var via = centre + new Vector3(MathF.Cos(angle), 0f, MathF.Sin(angle)) * (PuddleKeepOut + offset);
+                    if (Flat(via, Vector3.Zero) > FruConstants.Geometry.ArenaRadius - HazardMargin - DetourRoom) continue;
+                    if (!puddles.All(p => SweepClear(starts, via, p, PuddleKeepOut + DetourSlack) && PathClear(via, to, p, PuddleKeepOut + DetourSlack)))
+                        continue;
+                    var length = Flat(starts[0], via) + Flat(via, to);
+                    if (length < shortest && safe((via, length))) (best, shortest) = (via, length);
+                }
+        return best;
+    }
+
+    private bool ClearOfComingHazards((Vector3 Via, float Length) detour)
+    {
+        var now = Now;
+        var passedBy = now + DetourPassing + detour.Length / Walk;
+        return hazards.All(h => h.At <= now || h.At > passedBy || h.Depth(detour.Via) <= -(DetourRoom + HazardMargin));
+    }
+
+    private static Vector3 ShortOfPuddles(Vector3 from, Vector3 to, IReadOnlyList<Vector3> puddles)
+    {
+        var length = Flat(from, to);
+        var reached = 0f;
+        for (var s = 0f; s <= length; s += PathSample)
+        {
+            var point = PointAt(from, to, s, length);
+            if (!puddles.All(p => Flat(point, p) >= MathF.Min(PuddleKeepOut, Flat(from, p)) - 0.01f)) break;
+            reached = s;
+        }
+        return PointAt(from, to, reached, length);
+    }
+
+    private static bool SweepClear(IReadOnlyList<Vector3> starts, Vector3 to, Vector3 puddle, float clearance)
+        => starts.All(s => PathClear(s, to, puddle, clearance)) && (starts.Count < 2 || !Within(puddle, starts[0], starts[1], to));
+
+    private static bool PathClear(Vector3 from, Vector3 to, Vector3 puddle, float clearance)
+        => DistanceToPath(puddle, from, to) >= MathF.Min(clearance, MathF.Min(Flat(from, puddle), Flat(to, puddle))) - 0.01f;
+
+    private static bool Within(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+    {
+        static float Side(Vector3 p, Vector3 a, Vector3 b) => (b.X - a.X) * (p.Z - a.Z) - (b.Z - a.Z) * (p.X - a.X);
+        var (ab, bc, ca) = (Side(p, a, b), Side(p, b, c), Side(p, c, a));
+        return (ab > 0f && bc > 0f && ca > 0f) || (ab < 0f && bc < 0f && ca < 0f);
     }
 
     private static float DistanceToPath(Vector3 point, Vector3 from, Vector3 to)

@@ -3,7 +3,7 @@
 
   <PropertyGroup>
     <Authors>Hanachan (based on AnoMech by Anomek)</Authors>
-    <Version>0.2.3.0</Version>
+    <Version>0.2.4.0</Version>
     <Description>Practice FFXIV Futures Rewritten (Ultimate) phases 3 to 5 solo, client-side.</Description>
     <AssemblyName>FruPractice</AssemblyName>
     <RootNamespace>AnoMech</RootNamespace>
