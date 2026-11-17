@@ -12,8 +12,10 @@ public sealed class FruP5FullAi
     public void Run(SimWorld world)
     {
         var ai = new AiManager(world);
-        ai.Move(0.2f, () => ByRole(_ => Vector3.Zero), jitter: 0.3f, arrivalTime: 5f, stagingMove: true);
-        ai.Move(102f, () => ByRole(_ => Vector3.Zero), jitter: 0.3f, arrivalTime: 108f);
+        // Open staging on the centre: the whole party, so 2 y of room.
+        ai.Move(0.2f, () => ByRole(_ => Vector3.Zero), jitter: 0.3f, arrivalTime: 5f, stagingMove: true, knownAt: 0.2f, room: 2f);
+        // Back to the centre for Pandora's Box (112.7): nothing is aimed, so the arrival is nominal.
+        ai.Move(102f, () => ByRole(_ => Vector3.Zero), jitter: 0.3f, arrivalTime: 108f, stagingMove: true, knownAt: 102f, room: 2f);
         world.Events.Add(111f, () => UseTankLimitBreak(world));
     }
 

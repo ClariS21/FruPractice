@@ -119,6 +119,7 @@ internal sealed record ScenarioRun(
         PerRole.ForceSeats = true;
         AoeQuery.Evaluated += OnAoeEvaluated;
         game = new Game();
+        game.World.MovementHabits = ShippedHabits.Value;
         game.World.MitPractice.Enabled = config.MitigationPractice;
         game.World.Announced += text => announcements.Add($"t={game.World.Events.Elapsed:F2} {text}");
         DalamudServices.Install(nameof(Plugin.Game), game);

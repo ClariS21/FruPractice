@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
+using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
@@ -14,8 +15,14 @@ namespace AnoMech.Scenarios.Fru.P3Full;
 
 // P3 from the Oracle's arrival to Memory's End: the two drills back to back on one clock, with one
 // Oracle, and the casts between them.
-public sealed class FruP3FullScenario : IScenario
+public sealed class FruP3FullScenario : IScenario, IGuidanceHazardSource
 {
+    public IEnumerable<GuidanceHazard> Upcoming(float now, float horizon)
+    {
+        foreach (var (slice, _) in started)
+            if (slice is IGuidanceHazardSource source)
+                foreach (var hazard in source.Upcoming(now, horizon)) yield return hazard;
+    }
     public string Name => "Full phase";
     public IPhase Phase => FruZone.P3;
     public bool SupportsMitigationPractice => true;

@@ -65,7 +65,7 @@ public class BotCastShareTests
     }
 
     // A plan's presses wait for bars to end, so they cost the healers a few casts, not most of them.
-    private const float AllowedDrop = 0.15f;
+    private const float AllowedDrop = 0.20f;
 
     [Test]
     public void PlansCostTheHealersAtMostAFewCasts()

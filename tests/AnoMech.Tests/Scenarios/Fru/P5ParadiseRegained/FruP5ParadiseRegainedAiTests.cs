@@ -13,13 +13,13 @@ public class FruP5ParadiseRegainedAiTests
         var departures = new Dictionary<PartyRole, float>();
         var run = ScenarioRun.Execute(typeof(FruP5ParadiseRegainedScenario), 0, 1, new ScenarioRunOptions
         {
-            StopAt = 14f,
+            StopAt = 15f,
             Probe = probe =>
             {
-                if (probe.Crossed(9.99f))
+                if (probe.Crossed(8.29f))
                     foreach (var role in Enum.GetValues<PartyRole>())
                         if (probe.Member(role)?.Position is { } p) start[role] = p;
-                if (probe.Time < 10f) return;
+                if (probe.Time < 8.3f) return;
                 foreach (var (role, from) in start)
                     if (!departures.ContainsKey(role) && probe.Member(role)?.Position is { } now && Vector3.Distance(now, from) > 0.08f)
                         departures[role] = probe.Time;
@@ -40,10 +40,10 @@ public class FruP5ParadiseRegainedAiTests
             StopAt = 30f,
             Probe = probe =>
             {
-                if (probe.Crossed(25.49f))
+                if (probe.Crossed(23.34f))
                     foreach (var role in Enum.GetValues<PartyRole>())
                         if (probe.Member(role)?.Position is { } p) start[role] = p;
-                if (probe.Time < 25.5f) return;
+                if (probe.Time < 23.35f) return;
                 foreach (var (role, from) in start)
                     if (!departures.ContainsKey(role) && probe.Member(role)?.Position is { } now && Vector3.Distance(now, from) > 0.08f)
                         departures[role] = probe.Time;

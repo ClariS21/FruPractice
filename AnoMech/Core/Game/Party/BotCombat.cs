@@ -133,7 +133,11 @@ internal sealed class BotCombat(SimWorld world)
         }
     }
 
-    private SimEnemy? FindTarget()
+    // A bar is up: moving now would call it off.
+    internal bool IsCasting(SimPartyNpc bot)
+        => bot.Casting.IsCasting || clocks.TryGetValue(bot, out var clock) && clock.Cast != null;
+
+    internal SimEnemy? FindTarget()
     {
         SimEnemy? first = null;
         foreach (var enemy in world.Children.OfType<SimEnemy>())

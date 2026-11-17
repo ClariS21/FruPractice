@@ -82,6 +82,10 @@ public sealed class Plugin : IDalamudPlugin
             actEmitter = ActEmitter.Install(actBridge, () => Config.SendSimEventsToAct);
             opcodeUpdater = new OpcodeUpdater();
             Game = new Game();
+            var habitsPath = Core.Game.Ai.Habits.MovementHabits.PathIn(PluginInterface.AssemblyLocation.DirectoryName ?? "");
+            var habits = Core.Game.Ai.Habits.MovementHabits.Load(habitsPath);
+            if (habits is null) Log.Warning($"Movement habits missing or invalid at {habitsPath}; bots move on the built-in defaults.");
+            Game.World.MovementHabits = habits ?? Core.Game.Ai.Habits.MovementHabits.Default;
             actEmitter.Attach(Game);
             Practice = new PracticeLoop(Game);
             Game.World.BotTiming = Config.BotTiming;
@@ -102,6 +106,8 @@ public sealed class Plugin : IDalamudPlugin
             DeathRecapWindow = new DeathRecapWindow(Game);
             windowSystem.AddWindow(DeathRecapOverlay);
             windowSystem.AddWindow(DeathRecapWindow);
+            windowSystem.AddWindow(new GuidanceOverlay(Game));
+            windowSystem.AddWindow(new GuidanceResultWindow(Game));
 #if DEBUG
             DamageDebugWindow = new DamageDebugWindow(this);
             windowSystem.AddWindow(DamageDebugWindow);

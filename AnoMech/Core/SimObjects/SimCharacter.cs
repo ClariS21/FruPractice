@@ -123,6 +123,7 @@ public abstract class SimCharacter : ISimObject, IPositioned
     }
     public bool IsIntercepting => Motion.IsIntercepting;
     internal bool Relocating => Motion.IsMoving || Motion.IsForcedMoving;
+    internal bool ForcedMoving => Motion.IsForcedMoving;
     public Vector3? MoveDestination => Motion.Destination;
 
     // An AI order; a mechanic that takes control uses ForceFollow. A null or dead target releases it.

@@ -11,10 +11,17 @@ public sealed class FruP3FullAi
 {
     private static readonly PartyRole[] NonTanks = [.. Enum.GetValues<PartyRole>().Where(role => role is not (PartyRole.MainTank or PartyRole.OffTank))];
 
+    // Shockwave Pulsar starts casting here; Black Halo hits at 81.8 + its 4.7 s cast + 0.3 s to the effect.
+    private const float PulsarCastAt = 73.5f;
+    private const float BlackHaloHitsAt = 86.8f;
+
     public void Run(SimWorld world)
     {
         var ai = new AiManager(world);
-        ai.Move(73f, () => ByRole(BlackHaloSpot), jitter: 0.3f, arrivalTime: 80.5f);
+        // The party takes its Black Halo places once the Pulsar is on its way; nobody but the main tank is hit,
+        // so the row is only where to stand; a room of 1 y keeps its 3 y spacing.
+        ai.Move(PulsarCastAt, () => ByRole(BlackHaloSpot), knownAt: PulsarCastAt, knownBy: CueKind.Cast, room: 1f,
+            jitter: 0.3f, arrivalTime: BlackHaloHitsAt);
     }
 
     private static Vector3? BlackHaloSpot(PartyRole role) => role switch

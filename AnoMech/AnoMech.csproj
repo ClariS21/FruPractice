@@ -3,7 +3,7 @@
 
   <PropertyGroup>
     <Authors>Hanachan (based on AnoMech by Anomek)</Authors>
-    <Version>0.1.5.0</Version>
+    <Version>0.2.0.0</Version>
     <Description>Practice FFXIV Futures Rewritten (Ultimate) phases 3 to 5 solo, client-side.</Description>
     <AssemblyName>FruPractice</AssemblyName>
     <RootNamespace>AnoMech</RootNamespace>
@@ -18,9 +18,10 @@
     <None Include="..\images\icon.png" Link="images\icon.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- Every look in Resources/main-tank-looks ships next to the DLL, and so inside latest.zip. -->
+  <!-- Every look in Resources/main-tank-looks and the movement habits ship next to the DLL, and so inside latest.zip. -->
   <ItemGroup>
     <None Include="Resources/main-tank-looks/*.json" CopyToOutputDirectory="PreserveNewest" Link="main-tank-looks/%(Filename)%(Extension)" />
+    <None Include="Resources/movement/habits.json" CopyToOutputDirectory="PreserveNewest" Link="movement/habits.json" />
   </ItemGroup>
 
   <ItemGroup>

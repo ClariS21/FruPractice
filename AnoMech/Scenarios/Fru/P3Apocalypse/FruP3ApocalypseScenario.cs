@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
+using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
@@ -13,8 +14,11 @@ using Actions = AnoMech.Scenarios.Fru.FruActions;
 
 namespace AnoMech.Scenarios.Fru.P3Apocalypse;
 
-public sealed class FruP3ApocalypseScenario : IScenario
+public sealed class FruP3ApocalypseScenario : IScenario, IGuidanceHazardSource
 {
+    private ApocalypseHazards? guidanceHazards;
+    public IEnumerable<GuidanceHazard> Upcoming(float now, float horizon)
+        => guidanceHazards?.Upcoming(now, horizon) ?? [];
     public string Name => "Apocalypse";
     public IPhase Phase => FruZone.P3;
 
@@ -59,6 +63,7 @@ public sealed class FruP3ApocalypseScenario : IScenario
     {
         world = worldParam;
         state = stateParam;
+        guidanceHazards = new ApocalypseHazards(state, world.Events.Elapsed);
         if (selectedAi is { } idx && idx < AiStrats.Count)
             ((IScenarioAi<FruP3ApocalypseState>)AiStrats[idx]).Run(state, world);
 

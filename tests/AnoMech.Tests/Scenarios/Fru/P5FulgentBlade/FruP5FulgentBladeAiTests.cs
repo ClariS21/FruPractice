@@ -28,11 +28,11 @@ public class FruP5FulgentBladeAiTests
                 if (positions.Length != 8) return;
                 var center = positions.Aggregate(Vector3.Zero, (sum, item) => sum + item.Position) / positions.Length;
                 var spread = positions.Average(item => Vector3.Distance(item.Position, center));
-                if (probe.Time is >= 18f and < 20.75f) largestHoldingSpread = MathF.Max(largestHoldingSpread, (float)spread);
-                if (probe.Time is >= 20.8f and < 22.5f) largestMovingSpread = MathF.Max(largestMovingSpread, (float)spread);
-                if (probe.Crossed(20.75f))
+                if (probe.Time is >= 18f and < 20.65f) largestHoldingSpread = MathF.Max(largestHoldingSpread, (float)spread);
+                if (probe.Time is >= 20.7f and < 22.5f) largestMovingSpread = MathF.Max(largestMovingSpread, (float)spread);
+                if (probe.Crossed(20.65f))
                     foreach (var (role, position) in positions) firstStack[role] = position;
-                if (probe.Time < 20.8f) return;
+                if (probe.Time < 20.66f) return;
                 foreach (var (role, position) in positions)
                     if (!departures.ContainsKey(role) && firstStack.TryGetValue(role, out var start)
                         && Vector3.Distance(position, start) > 0.08f)
@@ -142,7 +142,7 @@ public class FruP5FulgentBladeAiTests
                 Assert.That(distance, Is.LessThanOrEqualTo(1.5f), $"layout {layout} step {step}");
             Assert.That(departures, Has.Count.EqualTo(24), $"layout {layout}");
             foreach (var (key, delay) in departures)
-                Assert.That(delay, Is.InRange(0.29f, 1.2f), $"layout {layout} {key}");
+                Assert.That(delay, Is.InRange(0f, 1.2f), $"layout {layout} {key}");
         }
     }
 

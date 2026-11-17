@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The packager's default targets, with an explicit file list: the top-level output files it zips
-     by default, plus the shipped main-tank looks in their folder (it never zips subfolders itself). -->
+     by default, plus the shipped data in its folders, main-tank looks and movement habits (it never
+     zips subfolders itself). -->
 <Project>
     <Target Name="DalamudPackagerDebug"
             AfterTargets="Build"
@@ -21,6 +22,7 @@
             <PackagedFile Include="@(PackagedTopLevel->'%(Filename)%(Extension)')" />
             <!-- The packager writes the manifest after the glob is evaluated. -->
             <PackagedFile Include="$(AssemblyName).json" />
+            <PackagedFile Include="movement\habits.json" />
             <PackagedFile Include="@(PackagedLook->'main-tank-looks\%(Filename)%(Extension)')" />
         </ItemGroup>
         <DalamudPackager ProjectDir="$(ProjectDir)"

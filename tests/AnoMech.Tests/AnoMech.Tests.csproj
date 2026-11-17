@@ -9,6 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Update="Fixtures/apocalypse-real-path.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../AnoMech/Resources/movement/habits.json" CopyToOutputDirectory="PreserveNewest" Link="movement/habits.json" />
     <None Include="Data/main-tank-looks/*.json" CopyToOutputDirectory="PreserveNewest" Link="main-tank-looks-sample/%(Filename)%(Extension)" />
   </ItemGroup>
 

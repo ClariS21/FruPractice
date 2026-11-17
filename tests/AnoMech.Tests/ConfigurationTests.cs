@@ -3,6 +3,17 @@ namespace AnoMech.Tests;
 public class ConfigurationTests
 {
     [Test]
+    public void PathGuidanceDefaultsOffAndPersistsEveryLevel()
+    {
+        Assert.That(new Configuration().PathGuidance, Is.EqualTo(PathGuidance.Off));
+        foreach (var level in Enum.GetValues<PathGuidance>())
+        {
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(new Configuration { PathGuidance = level });
+            Assert.That(Newtonsoft.Json.JsonConvert.DeserializeObject<Configuration>(json)!.PathGuidance, Is.EqualTo(level));
+        }
+    }
+
+    [Test]
     public void MitigationPracticeIsOnByDefault()
     {
         Assert.That(new Configuration().MitigationPractice, Is.True);

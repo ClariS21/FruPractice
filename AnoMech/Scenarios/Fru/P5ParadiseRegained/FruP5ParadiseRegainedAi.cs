@@ -14,55 +14,58 @@ public sealed class FruP5ParadiseRegainedAi : IScenarioAi<FruP5ParadiseRegainedS
 
     private FruP5ParadiseRegainedState state = null!;
 
+    // The line is cast at LinesAt; its first hit snapshots 0.2 s later and the strike lands on the
+    // players as the ActionEffect plays, 0.5 s after the cast. The echo repeats it, lethal at its snapshot.
+    private const float LineEffectAfter = 0.5f;
+    // A tower or a hit has decided who is in it at its snapshot, so its spot is free just after.
+    private const float AfterSnapshot = 0.05f;
+    // A line is 6 wide; leaving it from its middle is 3 y, plus a body.
+    private const float LineExit = 3.5f;
+    // Pandora locks onto the wing's bait here, from where the players stand.
+    private const float WingBaitLocksAt = 12.4f;
+
     public void Run(FruP5ParadiseRegainedState stateParam, SimWorld world)
     {
         state = stateParam;
         var ai = new AiManager(world);
-        // Human-like layer, as in Fulgent Blade: every seat stands a little off its spot, drifts while
-        // it holds, and leaves a shared move one after another (tanks first). AiManager still makes
-        // each of them arrive at least 0.8 s early.
-        var rng = world.Stream("p5-paradise-movement");
-        var offsets = Enumerable.Range(0, 8).Select(_ => Offset(0.3f + rng.NextSingle() * 0.3f, rng.NextSingle())).ToArray();
-        Vector3[] Drift() => Enumerable.Range(0, 8).Select(_ => Offset(0.1f + rng.NextSingle() * 0.2f, rng.NextSingle())).ToArray();
-        float[] Delays() => Enumerable.Range(0, 8).Select(i => ((PartyRole)i).IsTank()
-            ? rng.NextSingle() * 0.3f : 0.5f + rng.NextSingle() * 1f).ToArray();
-        Func<IAiMove> At(Func<PartyRole, Vector3?> spot, Vector3[]? drift = null)
-            => () => ByRole(role => spot(role) is { } p ? p + offsets[(int)role] + (drift?[(int)role] ?? Vector3.Zero) : null);
-        var firstDelays = Delays();
-        ai.Move(2f, At(StackUnderFirstTower), jitter: 0f, arrivalTime: 8.3f, stagingMove: true);
-        var hold = Drift();
-        ai.Move(8.6f, At(StackUnderFirstTower, hold), jitter: 0f, arrivalTime: 9.4f, departureDelay: _ => 0f);
-        ai.Move(10f, At(role => state.Rotate(FirstWingSpot(role))), jitter: 0f, arrivalTime: TowerHitAt(0),
-            departureDelay: role => firstDelays[(int)role]);
-        var secondDelays = Delays();
-        ai.Move(16.5f, At(role => state.Rotate(SecondWingSpot(role))), jitter: 0f, arrivalTime: TowerHitAt(1),
-            departureDelay: role => secondDelays[(int)role]);
-        var settle = Drift();
-        ai.Move(TowerHitAt(1) + 0.4f, At(role => state.Rotate(SecondWingSpot(role)), settle), jitter: 0f, arrivalTime: TowerHitAt(1) + 1.4f, departureDelay: _ => 0f);
-        // Polarizing Strikes: the same layer, with smaller offsets so a bait's side and depth, which the
-        // lines are aimed by, never change.
-        var lineOffsets = Enumerable.Range(0, 8).Select(_ => Offset(0.15f + rng.NextSingle() * 0.15f, rng.NextSingle())).ToArray();
-        Func<IAiMove> Lines(Func<PartyRole, Vector3?> spot)
-            => () => ByRole(role => spot(role) is { } p ? p + lineOffsets[(int)role] : null);
-        var prepositionDelays = Delays();
-        ai.Move(25.5f, Lines(PolarizingPreposition), jitter: 0f, arrivalTime: 30f, departureDelay: role => prepositionDelays[(int)role]);
-        var firstLinesDelays = Delays();
-        ai.Move(30f, Lines(role => LineSpot(role, 0, dodged: false)), jitter: 0f, arrivalTime: LinesAimedAt(0),
-            departureDelay: role => firstLinesDelays[(int)role]);
+        Func<IAiMove> At(Func<PartyRole, Vector3?> spot) => () => ByRole(spot);
+
+        // The strat's spots are exact for whoever the habit layer doesn't drive (LastMoment bots, and the
+        // human's seat when a test drives it), so those moves say jitter: 0. Habit-timed bots settle
+        // within `room` of the spot instead.
+        // Open staging under the first tower, known from the cast.
+        ai.Move(2f, At(StackUnderFirstTower), arrivalTime: 8.3f, stagingMove: true, room: 1.5f);
+        // The wing's cast (8.3) gives the order and with it the first spots. The bait is whoever is
+        // nearest or farthest from Pandora when she locks on (12.4), and the tanks stand where it makes
+        // them the bait, so that is the deadline for everyone; the tower (15.7) and the cone come later.
+        ai.Move(8.3f, At(role => state.Rotate(FirstWingSpot(role))), jitter: 0f, knownAt: 8.3f, knownBy: CueKind.Cast, room: 0.5f,
+            arrivalTime: WingBaitLocksAt);
+        // The first wing landing (the buster, 16.5) frees the second spots; its tower is at TowerHitAt(1).
+        ai.Move(16.5f, At(role => state.Rotate(SecondWingSpot(role))), jitter: 0f, knownAt: 16.5f, knownBy: CueKind.Resolve, room: 0.5f,
+            arrivalTime: TowerHitAt(1));
+        // Polarizing Strikes preposition once the last tower has resolved (the soakers stay for it). It
+        // is known from the previous phase; the cast (30.35) only confirms it.
+        var towersDone = TowerHitAt(2) + 0.65f;
+        ai.Move(towersDone, At(PolarizingPreposition), jitter: 0f, knownAt: towersDone, knownBy: CueKind.Resolve, room: 0.3f, arrivalTime: 30f);
+        // The first bait spots: the tanks leave the preposition for them; the rest are already there.
+        // The two nearest to Pandora are baited when the lines are aimed, so each bait's side and
+        // depth, which the lines are aimed by, are tight.
+        ai.Move(30.35f, At(role => LineSpot(role, 0, dodged: false)), jitter: 0f, knownAt: 30.35f, knownBy: CueKind.Cast, room: 0.3f,
+            arrivalTime: LinesAimedAt(0));
         for (var round = 0; round < 4; round++)
         {
             var r = round;
-            var gatherDelays = Delays();
-            var dodgeDelays = Delays();
-            if (r > 0) ai.Move(LinesAt(r) - 1.4f, Lines(role => LineSpot(role, r, dodged: false)), jitter: 0f, arrivalTime: LinesAimedAt(r),
-                departureDelay: role => gatherDelays[(int)role]);
-            ai.Move(LinesAt(r) + 1.2f, Lines(role => LineSpot(role, r, dodged: true)), jitter: 0f, arrivalTime: EchoAt(r),
-                departureDelay: role => dodgeDelays[(int)role]);
+            // Next round's baits gather where the last round's echo is about to land, so the spot is
+            // dangerous until the echo has decided who is hit, and it is aimed 1.9 s after that.
+            if (r > 0) ai.Move(EchoAt(r - 1), At(role => LineSpot(role, r, dodged: false)), jitter: 0f, knownAt: EchoAt(r - 1), knownBy: CueKind.Resolve,
+                room: 0.3f, arrivalTime: LinesAimedAt(r), notBefore: EchoAt(r - 1) + AfterSnapshot);
+            // The line's stack lands (CueKind.Resolve), and every bait leaves the line before its echo,
+            // which is lethal wherever the line went.
+            var lineLands = LinesAt(r) + LineEffectAfter;
+            ai.Move(lineLands, At(role => LineSpot(role, r, dodged: true)), jitter: 0f, knownAt: lineLands, knownBy: CueKind.Resolve, room: 0.3f,
+                outBy: EchoAt(r), exitDistance: LineExit);
         }
     }
-
-    private static Vector3 Offset(float radius, float angle)
-        => new(radius * MathF.Cos(angle * 2f * MathF.PI), 0f, radius * MathF.Sin(angle * 2f * MathF.PI));
 
     private static float LinesAimedAt(int round) => LinesAt(round) - 0.1f;
 

@@ -4,6 +4,7 @@ using System.Numerics;
 using AnoMech.Core.Game;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using static AnoMech.Windows.GroundDraw;
 
 namespace AnoMech.Windows;
 
@@ -17,9 +18,7 @@ public sealed class DeathRecapOverlay : Window
     private static readonly uint SpotColor = Rgba(0.3f, 1f, 0.4f, 1f);
     private static readonly uint LineColor = Rgba(1f, 1f, 1f, 0.85f);
     private static readonly uint AoeColor = Rgba(1f, 0.6f, 0.15f, 0.9f);
-    private static readonly uint ShadowColor = Rgba(0f, 0f, 0f, 0.8f);
     private const float SpotRingRadius = 1f;
-    private const int CircleSegments = 48;
 
     private readonly Game game;
 
@@ -111,59 +110,4 @@ public sealed class DeathRecapOverlay : Window
             back + forward * length + right * halfWidth, back + right * halfWidth, back - right * halfWidth,
         ], AoeColor, 2f);
 
-    private static void DrawGroundCircle(ImDrawListPtr draw, Vector3 center, float radius, uint color, float thickness)
-    {
-        var points = new List<Vector3>(CircleSegments + 1);
-        for (var i = 0; i <= CircleSegments; i++)
-        {
-            var angle = MathF.Tau * i / CircleSegments;
-            points.Add(center + new Vector3(MathF.Sin(angle), 0f, MathF.Cos(angle)) * radius);
-        }
-        DrawGroundPolyline(draw, points, color, thickness);
-    }
-
-    private static void DrawCross(ImDrawListPtr draw, Vector3 at, float size, uint color, float thickness)
-    {
-        DrawGroundLine(draw, at + new Vector3(-size, 0f, -size), at + new Vector3(size, 0f, size), color, thickness);
-        DrawGroundLine(draw, at + new Vector3(-size, 0f, size), at + new Vector3(size, 0f, -size), color, thickness);
-    }
-
-    private static void DrawGroundLine(ImDrawListPtr draw, Vector3 a, Vector3 b, uint color, float thickness)
-        => DrawGroundPolyline(draw, [a, b], color, thickness);
-
-    // Long lines are split so a segment that runs behind the camera only loses its hidden part.
-    private const float MaxSegmentLength = 1f;
-
-    private static void DrawGroundPolyline(ImDrawListPtr draw, IReadOnlyList<Vector3> points, uint color, float thickness)
-    {
-        for (var i = 1; i < points.Count; i++)
-        {
-            var a = points[i - 1];
-            var b = points[i];
-            var steps = Math.Max(1, (int)MathF.Ceiling(Vector3.Distance(a, b) / MaxSegmentLength));
-            for (var s = 0; s < steps; s++)
-            {
-                var p = Vector3.Lerp(a, b, (float)s / steps);
-                var q = Vector3.Lerp(a, b, (float)(s + 1) / steps);
-                if (Project(p) is not { } sp || Project(q) is not { } sq) continue;
-                draw.AddLine(sp, sq, ShadowColor, thickness + 2f);
-                draw.AddLine(sp, sq, color, thickness);
-            }
-        }
-    }
-
-    private static void Label(ImDrawListPtr draw, Vector3 at, string text, uint color)
-    {
-        if (Project(at + new Vector3(0f, 0.3f, 0f)) is not { } screen) return;
-        var size = ImGui.CalcTextSize(text);
-        var pos = screen - new Vector2(size.X / 2f, size.Y + 6f);
-        draw.AddText(pos + new Vector2(1f, 1f), ShadowColor, text);
-        draw.AddText(pos, color, text);
-    }
-
-    private static uint Rgba(float r, float g, float b, float a)
-        => ((uint)(a * 255f) << 24) | ((uint)(b * 255f) << 16) | ((uint)(g * 255f) << 8) | (uint)(r * 255f);
-
-    private static Vector2? Project(Vector3 world)
-        => Plugin.GameGui.WorldToScreen(world, out var screen, out _) ? screen : null;
 }

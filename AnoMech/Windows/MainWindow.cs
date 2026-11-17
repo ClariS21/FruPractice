@@ -815,6 +815,7 @@ public unsafe class MainWindow : Window, IDisposable
     }
 
     private static readonly string[] BotTimingLabels = ["Human-like", "Last moment"];
+    private static readonly string[] PathGuidanceLabels = ["Off", "Debrief only", "Spot only", "Full guide"];
 
     private void DrawBotTimingSelector()
     {
@@ -830,6 +831,14 @@ public unsafe class MainWindow : Window, IDisposable
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Human-like: bots react after a short delay and arrive early.\n"
                              + "Last moment: bots leave as late as they can and arrive just in time.");
+        SettingsGrid.Row("Path guide:");
+        var guide = (int)Plugin.Config.PathGuidance;
+        ImGui.SetNextItemWidth(SetupDropdownWidth * ImGuiHelpers.GlobalScale);
+        if (ImGui.Combo("##path-guide", ref guide, PathGuidanceLabels, PathGuidanceLabels.Length))
+        {
+            Plugin.Config.PathGuidance = (PathGuidance)guide;
+            Plugin.Config.Save();
+        }
     }
 
     // Indexed by MitigationPractice.

@@ -1,5 +1,6 @@
 using System;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.Game.Guidance;
 using AnoMech.Core.Native.Interfaces;
 using AnoMech.Core.SimObjects;
 using AnoMech.Scenarios;
@@ -13,6 +14,7 @@ public sealed class Game : IDisposable
 {
     public EventScheduler Events { get; } = new();
     public SimWorld World { get; }  
+    public GuidanceRun Guidance { get; }
     public ScenarioCatalog Catalog { get; } = ScenarioCatalog.Create();
     public float EventTimeScale { get; set; } = 1f;
     public bool GodMode { get; set; }
@@ -50,6 +52,7 @@ public sealed class Game : IDisposable
     public Game()
     {
         World = new SimWorld(Events);
+        Guidance = new GuidanceRun(this);
     }
 
 
@@ -155,6 +158,7 @@ public sealed class Game : IDisposable
         run.Frozen += OnRunFrozen;
         RunBeginning?.Invoke();
         run.Start();
+        Guidance.Start();
         RunStarted?.Invoke(p);
         return null;
     }
@@ -163,6 +167,7 @@ public sealed class Game : IDisposable
     {
         if (run is { } ending)
         {
+            Guidance.Finish();
             run = null;
             endedRun = ending;
             ending.Finished -= OnRunFinished;
@@ -199,6 +204,9 @@ public sealed class Game : IDisposable
         Events.Tick(deltaSeconds * EventTimeScale);
         World.Tick(deltaSeconds * EventTimeScale);
         run?.Tick(deltaSeconds * EventTimeScale);
+        Guidance.Sample();
+        if (Status is SessionStatus.CompletedFailed or SessionStatus.CompletedWithMistake or SessionStatus.Succeeded or SessionStatus.Frozen)
+            Guidance.Finish();
     }
 
     // Reports the death even in godmode, so the user learns what would have killed them; only the
@@ -214,6 +222,7 @@ public sealed class Game : IDisposable
         var progress = target is SimPlayer ? ActiveScenario?.RunProgress : null;
         Plugin.ChatGui.Print(new XivChatEntry { Type = XivChatType.SystemMessage, Message = $"{PluginIdentity.ChatPrefix} {DescribeName(target)} died: {cause}{(progress != null ? $". {progress}" : "")}" });
         if (target is SimPlayer && Plugin.Config.ShowDeathRecap) Recap = BuildRecap(target, cause, progress);
+        if (target is SimPlayer) Guidance.Finish();
         run?.OnDeathReported(DescribeName(target), cause);
 
         if (GodMode)

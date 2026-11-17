@@ -4,6 +4,7 @@ using System;
 namespace AnoMech;
 
 public enum BotTiming { HumanLike, LastMoment }
+public enum PathGuidance { Off, DebriefOnly, SpotOnly, FullGuide }
 
 [Serializable]
 public class Configuration : IPluginConfiguration
@@ -24,6 +25,7 @@ public class Configuration : IPluginConfiguration
     // Party bots auto-attack and use job actions on the boss; animation only.
     public bool BotsAttackBoss { get; set; } = true;
     public BotTiming BotTiming { get; set; } = BotTiming.HumanLike;
+    public PathGuidance PathGuidance { get; set; } = PathGuidance.Off;
     // Mechanics judge the player where the server would see them: this many ms earlier. 0 to 300.
     public int SimulatedPingMs { get; set; } = 80;
     // See MitPractice.

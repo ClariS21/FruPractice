@@ -6,6 +6,7 @@ using System.Numerics;
 using AnoMech.Core;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
+using AnoMech.Core.Game.Ai.Habits;
 using AnoMech.Core.Game.Geometry;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Map;
@@ -66,14 +67,51 @@ public sealed class SimWorld : ISimObject, IDisposable
     public Rng Rng { get; private set; } = Rng.Detached;
     private readonly Dictionary<string, Rng> streams = new();
     private readonly float?[] aiReactionBases = new float?[8];
-    private readonly BotMovementProfile?[] botProfiles = new BotMovementProfile?[8];
+    private readonly HabitProfile?[] habits = new HabitProfile?[8];
+    private MovementHabits movementHabits = MovementHabits.Default;
+
+    // The habit population bots draw from: the shipped file, or the built-in defaults without it.
+    public MovementHabits MovementHabits
+    {
+        get => movementHabits;
+        set
+        {
+            movementHabits = value;
+            Array.Clear(habits);
+        }
+    }
+
+    internal HabitMovement Movement { get; }
+
+    // What bots do between mechanics, within reach of their strat spot.
+    internal UptimeMovement Uptime { get; }
+
+    // The real player whose habits a bot seat follows this run; null for the human's seat and an
+    // empty one. Each seat draws on its own fork, so a seat's profile never depends on which moved first.
+    public HabitProfile? HabitFor(PartyRole role)
+    {
+        if (Party.Get(role) is not SimPartyNpc) return null;
+        var slot = (int)role;
+        return habits[slot] ??= MovementHabits.Draw(HabitRoleOf(role), Stream("movement-habit-profiles").Fork($"seat-{slot}"));
+    }
+
+    public static HabitRole HabitRoleOf(PartyRole role) => role switch
+    {
+        PartyRole.MainTank or PartyRole.OffTank => HabitRole.Tank,
+        PartyRole.RegenHealer or PartyRole.ShieldHealer => HabitRole.Healer,
+        PartyRole.MeleeDpsA or PartyRole.MeleeDpsB => HabitRole.Melee,
+        PartyRole.PhysRangedDps => HabitRole.Ranged,
+        _ => HabitRole.Caster
+    };
 
     public void Reseed(int seed)
     {
         Rng = new Rng(seed);
         streams.Clear();
         Array.Clear(aiReactionBases);
-        Array.Clear(botProfiles);
+        Array.Clear(habits);
+        Movement.Clear();
+        Uptime.Clear();
     }
 
     // This run's independent stream for one consumer, created on first use.
@@ -90,12 +128,6 @@ public sealed class SimWorld : ISimObject, IDisposable
         return aiReactionBases[slot] ??= 0.3f + 0.6f * Stream("ai-reaction").NextSingle();
     }
 
-    internal BotMovementProfile BotProfile(PartyRole role)
-    {
-        var slot = (int)role;
-        return botProfiles[slot] ??= BotMovementProfile.Roll(Stream("bot-profile").Fork($"seat-{slot}"));
-    }
-
     // Converts between scenario-local coordinates (the SimXxx public API) and
     // world/global coordinates (the engine's GameObject->Position). Shared by
     // every SimCharacter (injected as a protected field) and used by spawners
@@ -105,6 +137,8 @@ public sealed class SimWorld : ISimObject, IDisposable
     public SimWorld(EventScheduler events)
     {
         Events = events;
+        Movement = new HabitMovement(this);
+        Uptime = new UptimeMovement(this);
         Strat = new AnoMech.Core.Game.Ai.StratTrail(events);
         MitPractice = new AnoMech.Core.Game.PartyMit.MitPractice(this);
         PartyHp = new AnoMech.Core.Game.PartyHp.PartyHp(this);
@@ -249,6 +283,8 @@ public sealed class SimWorld : ISimObject, IDisposable
     {
         Map.Tick();
         Party.Tick(deltaSeconds);
+        Movement.Tick();
+        Uptime.Tick();
         children.Update(deltaSeconds);
         MitPractice.Tick();
         Healing.Tick();
@@ -268,6 +304,8 @@ public sealed class SimWorld : ISimObject, IDisposable
         MitPractice.Clear();
         Healing.Clear();
         Departures.Clear();
+        Movement.Clear();
+        Uptime.Clear();
         Party.EndRun();
     }
 

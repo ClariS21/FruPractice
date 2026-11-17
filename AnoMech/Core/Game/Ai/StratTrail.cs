@@ -12,6 +12,7 @@ public sealed class StratTrail(EventScheduler events)
     private const int MaxEntries = 1024;
 
     private readonly List<StratTarget> targets = [];
+    public IReadOnlyList<StratTarget> Entries => targets;
 
     public void Record(StratTarget target)
     {

@@ -21,64 +21,92 @@ public sealed class FruP5FulgentBladeAi : IScenarioAi<FruP5FulgentBladeState>
     // of group 2. The strat holds one spot for two waves, then steps after the odd one.
     private const int WaveCount = 8;
     private const float WaitMargin = 1.3f;
-    private const float PersonalMargin = 0.45f;
-    private const float StepAfterWave = 0.3f;
+    // The walking pace AiManager plans a habit move with.
+    private const float Walk = 6.5f;
+    // A hit's area has decided who dies at its snapshot, so a spot is safe again just after it.
+    private const float AfterSnapshot = 0.05f;
+    // The scenario picks the Akh Morn targets then, from where everyone stands.
+    private const float AkhMornPickAt = 34.05f;
 
     public void Run(FruP5FulgentBladeState stateParam, SimWorld world)
     {
         state = stateParam;
         var ai = new AiManager(world);
-        var rng = world.Stream("p5-fulgent-movement");
         // Spot 0 waits out waves 0-1, spot j (1-3) holds waves 2j and 2j+1.
         var spots = PlanSpots(state);
-        var offsets = Enumerable.Range(0, 8).Select(_ => Offset(0.3f + rng.NextSingle() * 0.2f, rng.NextSingle())).ToArray();
-        var drifts = new[] { 18.2f, 19.5f }
-            .Select(_ => Enumerable.Range(0, 8).Select(_ => Offset(0.1f + rng.NextSingle() * 0.15f, rng.NextSingle())).ToArray()).ToArray();
-        // Each bot's personal spot, pulled back towards the shared one until it keeps clear of the lines.
-        Vector3 Personal(int spot, PartyRole role, Vector3? drift = null)
-        {
-            var wanted = offsets[(int)role] + (drift ?? Vector3.Zero);
-            for (var scale = 1f; scale > 0f; scale -= 0.25f)
-            {
-                var point = spots[spot] + wanted * scale;
-                if (Margin(state, point, WavesHeldAt(spot)) >= PersonalMargin) return point;
-            }
-            return spots[spot];
-        }
 
-        ai.Move(0f, () => ByRole(CastPosition), jitter: 0f);
-        ai.Move(13.2f, () => ByRole(role => Personal(0, role)), jitter: 0f, arrivalTime: 17.2f,
-            departureDelay: role => role.IsTank() ? 0f : 0.25f + (int)role * 0.08f);
-        for (var i = 0; i < 2; i++)
-        {
-            var drift = drifts[i];
-            var at = i == 0 ? 18.2f : 19.5f;
-            ai.Move(at, () => ByRole(role => Personal(0, role, drift[(int)role])), jitter: 0f, arrivalTime: at + 0.5f,
-                departureDelay: _ => 0f);
-        }
+        // The strat's spots are exact for whoever the habit layer doesn't drive (LastMoment bots, and the
+        // human's seat when a test drives it), so those moves say jitter: 0. Habit-timed bots settle
+        // within `room` of the spot instead.
+        // Opening spot: open staging.
+        ai.Move(0f, () => ByRole(CastPosition), stagingMove: true, room: 1f);
+        // The first group's lines are drawn at 11.55 and spot 0 follows from them alone. The danger is
+        // that group's first hit.
+        ai.Move(11.55f, () => ByRole(_ => spots[0]), jitter: 0f, knownAt: 11.55f, knownBy: CueKind.Cast, room: RoomAt(state, spots, 0),
+            arrivalTime: FirstHitOfWave(0));
+        // Each step follows the freeing wave landing (CueKind.Resolve). The spot being left is inside
+        // the next wave's lines, dangerous from that wave's first hit; the walk out of them, plus the
+        // room the party stood off its spot, is what it must clear by then. The window the freeing wave
+        // leaves is short, so the habit layer squeezes each bot into it in its own order: the leaders
+        // go on the wave's heels and the rest sprint a beat behind.
         for (var step = 1; step <= 3; step++)
         {
-            var spot = step;
-            var freeingWave = 2 * step - 1;
-            var leave = LastHitOfWave(freeingWave) + StepAfterWave;
-            var arrive = FirstHitOfWave(freeingWave + 1) - 0.2f;
-            // Leaders walk off on the freeing wave's heels. The rest sprint a beat behind them, one after
-            // another within 0.2 s: a walk would leave them less than 0.8 s clear of the next wave's lines.
-            var followers = 0;
-            for (var i = 0; i < 8; i++)
-            {
-                var role = (PartyRole)i;
-                var leader = IsLeader(role);
-                var lag = leader ? 0f : 0.03f + 0.035f * followers++ + rng.NextSingle() * 0.025f;
-                IAiMove Spot() => ByRole(r => r == role ? Personal(spot, r) : null);
-                if (leader) ai.Move(leave, Spot, jitter: 0f, arrivalTime: arrive, departureDelay: _ => 0f);
-                else ai.Move(leave + lag, Spot, jitter: 0f, sprint: true);
-            }
+            var to = spots[step];
+            var freeingAt = LastHitOfWave(2 * step - 1);
+            var dodge = Dodge(state, spots[step - 1], to, step, RoomAt(state, spots, step - 1), RoomAt(state, spots, step));
+            ai.Move(freeingAt, () => ByRole(_ => to), jitter: 0f, knownAt: freeingAt, knownBy: CueKind.Resolve, room: RoomAt(state, spots, step),
+                outBy: dodge?.OutBy, exitDistance: dodge?.Exit, notBefore: freeingAt + AfterSnapshot);
         }
-        ai.Move(31.9f, () => ByRole(LightPartyStack), arrivalTime: 34f);
+        // The light party stacks are in wave 6's lines until it lands (their margin from wave 7's is
+        // 0.95 y, which caps the room). The bar (26.35) announced the stack long before; the move is
+        // scheduled once step 3 has run, or it would cancel it. Everyone is on it 0.8 s before the
+        // targets are picked.
+        ai.Move(LastHitOfWave(6), () => ByRole(LightPartyStack), jitter: 0f, knownAt: 26.35f, knownBy: CueKind.Cast, room: 0.8f,
+            arrivalTime: AkhMornPickAt, notBefore: LastHitOfWave(6) + AfterSnapshot);
     }
 
-    private static bool IsLeader(PartyRole role) => role is PartyRole.MainTank or PartyRole.OffTank or PartyRole.CasterDps;
+    // How far off a spot a bot may stray: inside the margin its held waves leave it.
+    private static float RoomAt(FruP5FulgentBladeState state, Vector3[] spots, int spot)
+        => Math.Clamp(Margin(state, spots[spot], WavesHeldAt(spot)) - 0.05f, 0.4f, 1f);
+
+    // When the spot being left turns dangerous (the first of the next two waves whose lines it is in)
+    // and how far the bot walks, on its way to the next spot, to be out of those lines. A bot stands
+    // within a room of either spot, so the walk may be that much longer or shorter; the new spot is
+    // clear of both waves, so a bot never needs to walk further than to it.
+    private static (float OutBy, float Exit)? Dodge(FruP5FulgentBladeState state, Vector3 from, Vector3 to, int step, float fromRoom, float toRoom)
+    {
+        (float OutBy, float Exit)? best = null;
+        var bestLatest = float.MaxValue;
+        var shortest = MathF.Max(0.3f, Vector3.Distance(from, to) - fromRoom - toRoom);
+        foreach (var wave in new[] { 2 * step, 2 * step + 1 })
+        {
+            var inside = InsideLength(state, from, to, wave);
+            if (inside <= 0f) continue;
+            var by = FirstHitOfWave(wave);
+            var wanted = inside + fromRoom + toRoom + 0.2f;
+            var exit = MathF.Min(wanted, shortest);
+            // What the walk is short of the distance wanted is paid in time: the deadline is declared early.
+            var latest = by - wanted / Walk;
+            if (latest >= bestLatest) continue;
+            bestLatest = latest;
+            best = (latest + exit / Walk, exit);
+        }
+        return best;
+    }
+
+    // How far along the straight walk from `from` to `to` a point is still inside a band of the wave
+    // (or within a hair of it): 0 if the walk starts and stays clear.
+    private static float InsideLength(FruP5FulgentBladeState state, Vector3 from, Vector3 to, int wave)
+    {
+        var length = Vector3.Distance(from, to);
+        var last = 0f;
+        for (var d = 0f; d <= length; d += 0.05f)
+        {
+            var point = length <= 0f ? from : Vector3.Lerp(from, to, d / length);
+            if (Margin(state, point, [wave]) < 0.15f) last = d + 0.05f;
+        }
+        return last;
+    }
 
     private static IEnumerable<int> WavesHeldAt(int spot) => spot == 0 ? [0, 1] : [2 * spot, 2 * spot + 1];
 
@@ -152,9 +180,6 @@ public sealed class FruP5FulgentBladeAi : IScenarioAi<FruP5FulgentBladeState>
         PartyRole.CasterDps => new Vector3(0f, 0f, 11f),
         _ => new Vector3(0f, 0f, 5.5f),
     };
-
-    private static Vector3 Offset(float radius, float angle)
-        => new(radius * MathF.Cos(angle * 2f * MathF.PI), 0f, radius * MathF.Sin(angle * 2f * MathF.PI));
 
     private Vector3? LightPartyStack(PartyRole role)
     {
