@@ -6,6 +6,7 @@ internal static class HabitTiming
 {
     internal const float Walk = 6.5f;
     internal const float Margin = AiManager.StaggeredArrivalMargin;
+    internal const float MaxSlackWait = 1.0f;
 
     // When a habit-timed bot sets off, all in scenario seconds. `reaction` is the profile's reaction
     // at quantile position `quantile`; `travel` is the walk in seconds. inBy: be at the spot by then;
@@ -21,7 +22,8 @@ internal static class HabitTiming
         float depart;
         if (float.IsPositiveInfinity(latestSafe)) depart = ready;
         else if (latestSafe < time) depart = time;
-        else if (slack >= 0f) depart = ready + Math.Clamp(slackUse, 0f, 1f) * slack;
+        // Full slack habits can return when uptime gives bots something to do while waiting.
+        else if (slack >= 0f) depart = ready + MathF.Min(Math.Clamp(slackUse, 0f, 1f) * slack, MaxSlackWait);
         // Too tight for the reaction: each bot's reaction quantile places it in what is left, so the
         // party keeps its order and stagger.
         else depart = time + quantile * (latestSafe - time);

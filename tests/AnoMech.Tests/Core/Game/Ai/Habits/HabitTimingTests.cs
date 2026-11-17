@@ -11,14 +11,21 @@ public class HabitTimingTests
         => HabitTiming.Departure(time, knownAt, reaction, quantile, slackUse, travel, inBy, outBy, exitDistance, notBefore);
 
     [Test]
-    public void WithSlackTheBotLeavesAfterItsReactionPlusItsShareOfTheSlack()
+    public void LongSlackAddsAtMostOneSecondAfterReaction()
+    {
+        Assert.That(Departure(knownAt: 0f, reaction: 0.5f, slackUse: 0.9f, inBy: 10.3f),
+            Is.EqualTo(0f + 0.5f + 1f).Within(1e-4f));
+    }
+
+    [Test]
+    public void WithSlackTheBotLeavesAfterItsReactionPlusCappedSlack()
     {
         // latestSafe = 8 - 0.8 - 1 = 6.2; ready at 1, so 5.2 s of slack.
         Assert.Multiple(() =>
         {
-            Assert.That(Departure(inBy: 8f), Is.EqualTo(1f + 0.5f * 5.2f).Within(1e-5f));
+            Assert.That(Departure(inBy: 8f), Is.EqualTo(2f).Within(1e-5f));
             Assert.That(Departure(inBy: 8f, slackUse: 0f), Is.EqualTo(1f).Within(1e-5f));
-            Assert.That(Departure(inBy: 8f, slackUse: 1f), Is.EqualTo(6.2f).Within(1e-5f));
+            Assert.That(Departure(inBy: 8f, slackUse: 1f), Is.EqualTo(2f).Within(1e-5f));
             Assert.That(Departure(knownAt: 2f, inBy: 8f, slackUse: 0f), Is.EqualTo(3f).Within(1e-5f));
         });
     }
@@ -55,7 +62,7 @@ public class HabitTimingTests
         Assert.Multiple(() =>
         {
             // A 3 s walk to an inBy of 10 would allow 6.2; leaving the danger takes 6.5 y = 1 s before 4 - 0.8.
-            Assert.That(Departure(slackUse: 1f, travel: 3f, inBy: 10f, outBy: 4f, exitDistance: 6.5f), Is.EqualTo(2.2f).Within(1e-5f));
+            Assert.That(Departure(slackUse: 1f, travel: 3f, inBy: 10f, outBy: 4f, exitDistance: 6.5f), Is.EqualTo(2f).Within(1e-5f));
             // Without an exit distance the whole walk has to fit: latestSafe = 0.2, so the reaction is squeezed.
             Assert.That(Departure(slackUse: 1f, travel: 3f, outBy: 4f), Is.EqualTo(0.5f * 0.2f).Within(1e-5f));
         });
