@@ -3,26 +3,28 @@
         "Author":  "Hanachan (based on AnoMech by Anomek)",
         "Name":  "FRU Practice",
         "InternalName":  "FruPractice",
-        "AssemblyVersion":  "0.2.4.0",
-        "Description":  "FRU phases 3 to 5 practice, based on AnoMech. Spawns fake party members and bosses client-side so you can practice the mechanics without a party.",
+        "AssemblyVersion":  "0.3.0.0",
+        "Description":  "FRU and DMU phases 3 to 5 practice, based on AnoMech. Spawns fake party members and bosses client-side so you can practice the mechanics without a party.",
         "ApplicableVersion":  "any",
         "RepoUrl":  "https://github.com/ClariS21/FruPractice",
         "Tags":  [
                      "fru",
                      "futures rewritten",
+                     "dmu",
+                     "dancing mad",
                      "ultimate",
                      "practice",
                      "simulator"
                  ],
         "DalamudApiLevel":  15,
-        "Punchline":  "Practice Futures Rewritten (Ultimate) P3 to P5 in an inn.",
+        "Punchline":  "Practice Futures Rewritten (Ultimate) and Dancing Mad (Ultimate) P3 to P5 in an inn.",
         "IconUrl":  "https://raw.githubusercontent.com/ClariS21/FruPractice/main/images/icon.png",
         "DownloadLinkInstall":  "https://github.com/ClariS21/FruPractice/releases/latest/download/latest.zip",
         "DownloadLinkUpdate":  "https://github.com/ClariS21/FruPractice/releases/latest/download/latest.zip",
         "DownloadLinkTesting":  "https://github.com/ClariS21/FruPractice/releases/latest/download/latest.zip",
         "IsHide":  false,
         "IsTestingExclusive":  false,
-        "LastUpdate":  1794950889,
+        "LastUpdate":  1794983340,
         "AcceptsFeedback":  false
     }
 ]

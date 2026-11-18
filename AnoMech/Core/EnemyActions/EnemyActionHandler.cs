@@ -73,13 +73,14 @@ internal sealed class EnemyActionHandler(SimCharacter caster, SimCast cast, SimW
         });
     }
 
-    public void CancelCast(CastCancelReason reason)
+    public bool CancelCast(CastCancelReason reason)
     {
-        if (casting is not { } handle) return;
+        if (casting is not { } handle) return false;
         casting = null;
         if (releasing == handle) releasing = null;
         handle.Cancelled();
         cast.Cancel(reason);
+        return true;
     }
 
     // The server aims a cast on another character at it, whichever way the caster faces.

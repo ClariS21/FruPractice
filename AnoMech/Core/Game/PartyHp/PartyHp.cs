@@ -30,7 +30,9 @@ internal sealed class PartyHp(SimWorld world)
 
     // Per-member server tick: when its HP update lands after the confirmation.
     public float RollTickDelay()
-        => TickDelayMin + world.Stream("hp-tick").NextSingle() * (TickDelayMax - TickDelayMin);
+        => world.Calibration.HpTickJitter
+            ? TickDelayMin + world.Stream("hp-tick").NextSingle() * (TickDelayMax - TickDelayMin)
+            : 0f;
 
     // The character's HP after `damage` lands, never below 1.
     public uint Hit(SimCharacter who, uint damage)

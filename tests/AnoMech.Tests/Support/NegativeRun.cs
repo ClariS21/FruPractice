@@ -1,5 +1,6 @@
 using System.Numerics;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.Game.PartyHp;
 using AnoMech.Core.Native.Interfaces;
 using AnoMech.Core.SimObjects;
 using AnoMech.Scenarios;
@@ -75,7 +76,7 @@ internal sealed class NegativeRun<TScenario>(PartyRole role, int strat) where TS
     }
 
     // The run starts at the first ShouldKill or ShouldFail; each ShouldKill judges the next group of
-    // deaths. Groups go in frame order, but within one frame the calls can come in any order. Deaths no call judges are
+    // deaths. Groups go in time order, but within one hit's spread the calls can come in any order. Deaths no call judges are
     // consequences (a stack one short, a tether partner left alone), not what the test broke.
     // Matched on the action the death names, so only Die(actionId, ...) counts.
     public NegativeRun<TScenario> ShouldKill(uint actionId, params PartyRole[] roles)
@@ -131,9 +132,13 @@ internal sealed class NegativeRun<TScenario>(PartyRole role, int strat) where TS
         return this;
     }
 
-    // A group is the unjudged deaths to the expected action in the frame of the first unjudged death.
-    // A raidwide they set off (a tether partner gone, a Hello World holder down) can land in that
-    // same frame; it stays unjudged.
+    // Each member dies on its own HP tick after the hit, so one hit's deaths spread over the ticks'
+    // range, and a frame more where the deaths' frames round it up.
+    private const float OneHitSpread = PartyHp.TickDelayMax - PartyHp.TickDelayMin + ScenarioRun.FrameSeconds * 1.5f;
+
+    // A group is the unjudged deaths to the expected action within one hit's spread of the first
+    // unjudged death. A raidwide they set off (a tether partner gone, a Hello World holder down) can
+    // land in that same window; it stays unjudged.
     private static string? GroupMismatch(
         ScenarioRun run, IReadOnlySet<int> judged, string expected, Func<Death, bool> matches, PartyRole[] allowed, PartyRole[] mustDie,
         out List<int> group)
@@ -143,8 +148,7 @@ internal sealed class NegativeRun<TScenario>(PartyRole role, int strat) where TS
         var unjudged = Enumerable.Range(0, run.Deaths.Count).Where(i => !judged.Contains(i)).ToList();
         if (unjudged.Count == 0) return $"{expected}, but nobody {(judged.Count == 0 ? "" : "else ")}died.";
         var first = run.Deaths[unjudged[0]];
-        group = unjudged.Where(i => run.Deaths[i].Time <= first.Time + ScenarioRun.FrameSeconds / 2
-                                    && matches(run.Deaths[i]))
+        group = unjudged.Where(i => run.Deaths[i].Time <= first.Time + OneHitSpread && matches(run.Deaths[i]))
                         .ToList();
         var deaths = group.Select(i => run.Deaths[i]).ToList();
         if (deaths.Count == 0) return $"{expected}, but {Describe([first])} first.";

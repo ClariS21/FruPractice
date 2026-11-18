@@ -9,6 +9,16 @@ using AnoMech.Scenarios.Fru.P4Full;
 using AnoMech.Scenarios.Fru.P5FulgentBlade;
 using AnoMech.Scenarios.Fru.P5Full;
 using AnoMech.Scenarios.Fru.P5ParadiseRegained;
+using AnoMech.Scenarios.Umad;
+using AnoMech.Scenarios.Umad.P3BlackHole;
+using AnoMech.Scenarios.Umad.P3Full;
+using AnoMech.Scenarios.Umad.P3LimitCut;
+using AnoMech.Scenarios.Umad.P4Full;
+using AnoMech.Scenarios.Umad.P4KefkaSays;
+using AnoMech.Scenarios.Umad.P5Celestriad;
+using AnoMech.Scenarios.Umad.P5Exaflares;
+using AnoMech.Scenarios.Umad.P5Flood;
+using AnoMech.Scenarios.Umad.P5Full;
 
 namespace AnoMech.Scenarios;
 
@@ -64,5 +74,15 @@ public sealed class ScenarioCatalog
         new FruP5FulgentBladeScenario(),
         new FruP5ParadiseRegainedScenario(),
         new FruP5FullScenario(),
+        new UmadP3BlackHoleScenario(),
+        new UmadP3LimitCutScenario(),
+        new UmadP3FullScenario(),
+        new UmadP4KefkaSaysScenario(),
+        new UmadP4FullScenario(),
+        new UmadP5CelestriadScenario(),
+        new UmadP5ExaflaresScenario(),
+        new UmadP5FloodScenario(),
+        new UmadP5ForsakenNull(),
+        new UmadP5FullScenario(),
     ]);
 }

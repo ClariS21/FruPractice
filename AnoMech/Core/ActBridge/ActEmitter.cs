@@ -100,7 +100,7 @@ internal sealed class ActEmitter
         Emit(ActLine.ActorControl(FruDirectorId, 0x4000000F, InstanceSecondsRemaining));
     });
 
-    private bool Active => sink.Connected && enabled();
+    private bool Active => sink.Connected && enabled() && (game is null || game.World.Calibration.ActEmission);
 
     private void Emit(string line) => sink.Send(line);
 

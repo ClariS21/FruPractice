@@ -6,7 +6,7 @@ namespace AnoMech.Tests;
 public class ScenarioCatalogTests
 {
     [Test]
-    public void TheCatalogHoldsOnlyTheNineFruP3ToP5Entries()
+    public void TheCatalogHoldsFruAndUmadP3ToP5Entries()
     {
         var entries = ScenarioCatalog.Create().Scenarios
             .Select(s => (s.Phase.Zone.Name, s.Phase.Name, s.Name,
@@ -24,21 +24,31 @@ public class ScenarioCatalogTests
             ("Futures Rewritten", "P5", "Fulgent Blade", "Standard"),
             ("Futures Rewritten", "P5", "Paradise Regained", "H first / M1-R1 NW / M2-R2 NE; lines T-M-R-H"),
             ("Futures Rewritten", "P5", "Full phase", "Standard · H first / M1-R1 NW / M2-R2 NE; lines T-M-R-H"),
+            ("Dancing Mad (Ultimate)", "P3", "Black Hole", "Black Hole: D>S>A | Black Hole: S>D>A"),
+            ("Dancing Mad (Ultimate)", "P3", "Limit Cut", "Standard"),
+            ("Dancing Mad (Ultimate)", "P3", "Full phase", "Standard · Black Hole: D>S>A"),
+            ("Dancing Mad (Ultimate)", "P4", "Kefka Says", "Kefka Says, gazes: supports N / DPS S | Kefka Says"),
+            ("Dancing Mad (Ultimate)", "P4", "Full phase", "Kefka Says, gazes: supports N / DPS S | Kefka Says"),
+            ("Dancing Mad (Ultimate)", "P5", "Celestriad", "Standard"),
+            ("Dancing Mad (Ultimate)", "P5", "Exaflares", "Spread"),
+            ("Dancing Mad (Ultimate)", "P5", "Flood", "Rotate"),
+            ("Dancing Mad (Ultimate)", "P5", "Forsaken Null", ""),
+            ("Dancing Mad (Ultimate)", "P5", "Full phase", "Role stacks, Omnitank · Rotate · Standard · Spread"),
         }));
     }
 
     [Test]
-    public void OnlyFulgentBladeOffersAnEmptyPartyRun()
+    public void OnlySupportedDrillsOfferAnEmptyPartyRun()
     {
         var solo = ScenarioCatalog.Create().Scenarios.Where(s => s.SupportsSolo).Select(s => s.Name);
-        Assert.That(solo, Is.EqualTo(new[] { "Fulgent Blade" }));
+        Assert.That(solo, Is.EqualTo(new[] { "Fulgent Blade", "Limit Cut", "Exaflares", "Flood" }));
     }
 
     private static IEnumerable<TestCaseData> ScenarioStrats()
         => from scenario in ScenarioCatalog.Create().Scenarios
            from strat in scenario.AiStrats.Select((ai, index) => (ai, index))
            select new TestCaseData(scenario.GetType(), strat.index)
-               .SetName($"{scenario.FullName()} [{strat.ai.Name}]");
+               .SetName($"{scenario.GetType().Name}: {scenario.FullName()} [{strat.ai.Name}]");
 
     [TestCaseSource(nameof(ScenarioStrats))]
     public void SunnyDay(Type scenarioType, int strat)

@@ -19,6 +19,8 @@ public sealed class SimCast : ISimObject
 
     private float remainingAnimationLock;
 
+    internal float RemainingAnimationLock => remainingAnimationLock;
+
     public bool IsCasting => parent.Proxy?.IsCasting ?? false;
 
     // Read live from CastInfo against the bar's own length.

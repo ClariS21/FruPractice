@@ -33,6 +33,8 @@ public sealed class ActorControl
     private const uint LimitBreakResolveCategory = 0x48;
     private const uint WallDeathCategory = 0x50;
     private const uint ConfusionCategory = 0x52;
+    private const uint SetNameCategory = 0x62;
+    private const uint SetOwnerCategory = 0x1A1;
     private const uint ModelStateCategory = 0x3F;
     private const uint GimmickJumpCategory = 0xDC;
     private const uint ZoneInCategory = 0xC8;
@@ -205,6 +207,10 @@ public sealed class ActorControl
     public void SetTargetable(bool targetable) => Send(TargetableCategory, targetable ? 1u : 0u);
 
     public void SetTarget(GameObjectId target) => proxy()?.ActorControlTarget(SetTargetCategory, target);
+
+    public void SetName(uint bnpcNameId) => Send(SetNameCategory, bnpcNameId);
+    public void SetOwner(uint entityId) => Send(SetOwnerCategory, entityId);
+    public void ClearOwner() => SetOwner(NoTarget);
 
     public void ClearTarget() => SetTarget(NoTarget);
 

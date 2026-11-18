@@ -46,11 +46,12 @@ public sealed class AiManager
     /// Times count from the AI's start. With HumanLike timing a bot's move is habit-timed (its seat's
     /// FFLogs profile picks the departure, path and settle spot) once the move declares when its spot
     /// became known or where its danger is: any of knownAt, a knownBy other than Cast, room, outBy,
-    /// exitDistance or notBefore, or stagingMove. A move declaring none of them keeps the old timing,
-    /// since its arrivalTime need not be a real danger deadline. hold, departureDelay, the human's seat
-    /// and LastMoment timing never use habits.
+    /// exitDistance or notBefore, or stagingMove, and the zone is calibrated for habits. Any other
+    /// Human-like move leaves after a reaction, since its arrivalTime need not be a real danger
+    /// deadline. hold, departureDelay, the human's seat and LastMoment timing never use habits, and a
+    /// zone not calibrated for human-like movement times every move as LastMoment.
     /// </remarks>
-    /// <param name="arrivalTime">If not empty, this is expected arrival time for bots. They will sprint if there is not enough time to walk, and they will leave as late as possible otherwise. For a habit-timed move it is inBy: the bot is on its spot at least 0.8 s before it</param>
+    /// <param name="arrivalTime">If not empty, this is expected arrival time for bots. They will sprint if there is not enough time to walk, and they will leave as late as possible otherwise. A Human-like bot leaves after a reaction instead and is on its spot at least 0.8 s before it; for a habit-timed move it is inBy</param>
     /// <param name="sprint">Ignored if arrivalTime is set. Sprint towards target instead of walking</param>
     /// <param name="settleFraction">With LastMoment and arrivalTime: the share of a walker's spare time spent waiting at the destination instead of the start</param>
     /// <param name="hold">With HumanLike and arrivalTime, wait until the latest safe departure</param>
@@ -76,7 +77,7 @@ public sealed class AiManager
         world.Events.Add(time, () =>
         {
             var move = positions();
-            var lastMoment = world.BotTiming == BotTiming.LastMoment;
+            var lastMoment = world.BotTiming == BotTiming.LastMoment || !world.Calibration.HumanLikeMovement;
             for (int i = 0; i < 8; i++)
             {
                 if (move[i] is not { } local) continue;
@@ -87,7 +88,7 @@ public sealed class AiManager
                 world.Strat.Record(new StratTarget(seat, spot, world.Events.Elapsed, startedAt + arrivalTime,
                     cue?.Mechanic, cue?.Why(seat), cue?.Source));
                 var generation = world.Movement.Supersede(seat);
-                if (declared && !hold && departureDelay is null && !lastMoment && member is SimPartyNpc bot)
+                if (declared && !hold && departureDelay is null && !lastMoment && member is SimPartyNpc bot && world.HabitFor(seat) is not null)
                 {
                     world.Movement.Plan(bot, seat, generation, new HabitOrder(spot, MathF.Max(0f, room ?? DefaultRoom),
                         knownAt is { } known ? startedAt + known : firesAt, knownBy, startedAt + arrivalTime,
@@ -98,8 +99,12 @@ public sealed class AiManager
                 var partyMember = member as ISimPartyMember;
                 var role = partyMember?.Role.ToString() ?? $"slot{i}";
                 var dist = Vector2.Distance(new Vector2(member.Position.X, member.Position.Z), new Vector2(target.X, target.Z));
+                // A human-like bot keeps the habit layer's margin on a move that declares nothing.
+                var margin = !lastMoment && !hold && departureDelay is null && member is SimPartyNpc
+                    ? StaggeredArrivalMargin
+                    : MoveDeadlineSafetyMargin;
                 var (sprinting, delay) = arrivalTime is { } arrival
-                    ? PlanArrival(dist, arrival - time - MoveDeadlineSafetyMargin)
+                    ? PlanArrival(dist, arrival - time - margin)
                     : (sprint, 0f);
                 if (departureDelay is not null)
                 {

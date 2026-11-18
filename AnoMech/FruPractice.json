@@ -2,11 +2,13 @@
     "Author": "Hanachan (based on AnoMech by Anomek)",
     "Name": "FRU Practice",
     "MinimumDalamudVersion": "15.0.3.5",
-    "Punchline": "Practice Futures Rewritten (Ultimate) P3 to P5 in an inn.",
-    "Description": "A private build of AnoMech for FRU phases 3 to 5. Spawns fake party members and bosses client-side so you can practice the mechanics without a party.",
+    "Punchline": "Practice Futures Rewritten (Ultimate) and Dancing Mad (Ultimate) P3 to P5 in an inn.",
+    "Description": "A private build of AnoMech for FRU and DMU phases 3 to 5. Spawns fake party members and bosses client-side so you can practice the mechanics without a party.",
     "Tags": [
         "fru",
         "futures rewritten",
+        "dmu",
+        "dancing mad",
         "ultimate",
         "practice",
         "simulator"

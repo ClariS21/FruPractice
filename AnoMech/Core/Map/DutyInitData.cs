@@ -10,4 +10,5 @@ public sealed record DutyInitData(
     EntranceBarrier EntranceBarrier,
     IReadOnlyList<ushort> MapEffectSnapshot,
     IReadOnlyList<byte[]> Rsv,
-    IReadOnlyList<byte[]> Rsf);
+    IReadOnlyList<byte[]> Rsf,
+    HelperPool HelperPool = default);

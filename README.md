@@ -1,6 +1,6 @@
 # ![FRU Practice](images/icon.png) FRU Practice
 
-A private Dalamud plugin for practising Futures Rewritten (Ultimate) phases 3 to 5 solo, client-side, with bots.
+A private Dalamud plugin for practising Futures Rewritten (Ultimate) and Dancing Mad (Ultimate) phases 3 to 5 solo, client-side, with bots.
 
 It is a fork of [shifusen329/AnoMech](https://github.com/shifusen329/AnoMech), which is itself a fork of
 [anomek/AnoMech](https://github.com/anomek/AnoMech). It spawns fake party members and bosses into your game client in an Inn and plays the
@@ -26,9 +26,19 @@ party changes will not show and ready checks will not pop until you leave. AnoMe
 
 ## What it practises
 
+### Futures Rewritten (Ultimate)
+
 - P3: Ultimate Relativity, Apocalypse, and the full phase.
 - P4: Darklit Dragonsong (both strats: "NA" and "NA, you take Somber Dance"), Crystallize Time, and the full phase.
 - P5: Fulgent Blade, Paradise Regained (with Polarizing Strikes), and the full phase.
+
+### Dancing Mad (Ultimate)
+
+- P3: Limit Cut, Black Hole, and the full phase.
+- P4: Kefka Says, and the full phase.
+- P5: Celestriad, Exaflares, Flood, Forsaken Null, and the full phase.
+- The tanks follow the Omnitank priority for their pair (Warrior, then Dark Knight, Gunbreaker, Paladin): it decides who holds Chaos in P3 and who invulns the first Surprise Holy in P5.
+- The sim has no boss HP. The P4 full phase's HP check is a Pass/Fail setting, and in the P5 full phase Kefka dies at a time you pick (214 s by default).
 
 Each drill runs on its own; the full-phase runs chain a phase's mechanics, carrying their results from one into the next.
 
@@ -49,6 +59,7 @@ Each drill runs on its own; the full-phase runs chain a phase's mechanics, carry
 
 - Visuals closely match retail, but damage snapshot timings are best guesses.
 - Not all skills resolve properly.
+- Dancing Mad (Ultimate) has no mitigation plans, guide danger zones or uptime windows yet, and its runs send nothing to ACT, so cactbot stays quiet there.
 
 ## Acknowledgments
 

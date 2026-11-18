@@ -24,7 +24,7 @@ public sealed class GuidanceRun(Game game)
         Debrief = null;
         hazards.Clear();
         lastTime = 0;
-        Recording = game.Player is not null;
+        Recording = game.Player is not null && game.World.Calibration.PathGuidance;
         recorder.Start(GuidanceLogic.Xz(game.Player?.Position ?? Vector3.Zero));
         Sample();
     }

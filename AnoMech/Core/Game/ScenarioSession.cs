@@ -154,6 +154,7 @@ public sealed class ScenarioSession
         world.HazardSource = Scenario as AnoMech.Core.Game.Guidance.IGuidanceHazardSource;
         try
         {
+            if (zone.DutyInitData.HelperPool.Count > 0) world.SpawnHelperPool(zone.DutyInitData.HelperPool);
             zone.Run(world);
             phase.Run(world);
             Scenario.Run(world, run.SelectedAi);

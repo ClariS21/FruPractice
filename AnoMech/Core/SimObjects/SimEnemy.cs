@@ -94,6 +94,7 @@ public sealed class SimEnemy : SimNpc
 {
     // The cast packets and the animation lock live in Casting; EnemyActionHandler decides when
     // they go out and what the action does.
+    private readonly SimWorld world;
     private readonly EnemyActionHandler actions;
     private readonly EventScheduler events;
 
@@ -154,6 +155,7 @@ public sealed class SimEnemy : SimNpc
         : base(proxy, world.Coordinates,
             self => new SimulatedMotion(() => self.Proxy, world.Coordinates, self.ActorControl, ObstacleField.Empty, BossTurnSpeed, npc: true))
     {
+        this.world = world;
         motion = (SimulatedMotion)Motion;
         BNpcBaseId = bNpcBaseId;
         DisplayName = displayName;
@@ -324,10 +326,24 @@ public sealed class SimEnemy : SimNpc
     public void Cast(EnemyAction action, CastTarget target = default, byte animationVariation = 0) =>
         actions.Start(action, target, animationVariation);
 
+    // The action cast by one of the zone's pooled helpers acting for this enemy, standing at `at`
+    // (this enemy's placement by default). A dead or despawned enemy still casts, unlinked.
+    public void CastFromHelper(EnemyAction action, CastTarget target = default, Placement? at = null, byte animationVariation = 0) =>
+        world.CastFromHelper(this, action, target, at ?? this.Placement(), animationVariation);
+
+    public void CastFromHelper(uint actionId, CastTarget target = default, Placement? at = null, float animationLock = 0.6f) =>
+        CastFromHelper(new EnemyAction(actionId) { Cast = new() { AnimationLock = animationLock } }, target, at);
+
     // Interrupts the cast still on its bar: neither its effect nor its mechanics go out.
-    public void CancelCast(CastCancelReason reason) => actions.CancelCast(reason);
+    public void CancelCast(CastCancelReason reason)
+    {
+        if (actions.CancelCast(reason)) world.HelperCastCancelled(this);
+    }
 
     public override bool AnimationLock => Casting.IsBusy || actions.AwaitingRelease;
+
+    // Seconds until AnimationLock ends; infinite while the bar is up or the ActionEffect pending.
+    internal float BusyFor => Casting.IsCasting || actions.AwaitingRelease ? float.PositiveInfinity : Casting.RemainingAnimationLock;
 
     // Stays turned toward the target, holding still while casting or animation-locked; null releases it.
     public void KeepFacing(SimCharacter? target) => motion.KeepFacing(target);

@@ -61,6 +61,7 @@ public sealed class InstanceSession
             }
         }
         world.Map.Enter(zone.TerritoryId);
+        world.Calibration = zone.Calibration;
         var session = new InstanceSession(world, zone, init.EntranceBarrier.Position - zone.Origin, mode);
         // Before any action mutates it, so Exit can restore it.
         Natives.UserActions.OnSessionStart();
@@ -150,6 +151,7 @@ public sealed class InstanceSession
         Dispose();
         Natives.Zone.Revert();
         world.Map.Unload();
+        world.Calibration = ZoneCalibration.All;
         world.ScenarioOrigin = default;
     }
 
