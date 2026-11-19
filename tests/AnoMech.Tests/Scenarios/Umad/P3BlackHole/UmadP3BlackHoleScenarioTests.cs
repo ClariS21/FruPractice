@@ -26,8 +26,8 @@ namespace AnoMech.Tests;
 //  119.09  Shockwaves from Chaos (-1,1.1) along the NE-SW diagonal; 121.11 NW-SE.
 //  120.58  Slap rows at x=10; 122.89 Final Slap; 123.26 the same cones as at 24.82.
 //  146.68  Blizzard III on everyone at (0,-5) supports and (0,5) DPS, landing 149.38.
-//  151.91  West tower (-10,0) M1 R; 152.14 Knock Down on SH, the supports stacked at the centre;
-//          153.20 east tower (10,0) M2 C, 154.50 west RH MT, 155.84 east SH OT.
+//  151.91  West tower (-10,0) M2 C; 152.14 Knock Down on SH, the supports stacked at the centre;
+//          153.20 east tower (10,0) M1 R, 154.50 west SH OT, 155.84 east RH MT.
 //
 // Times are when a hit snapshots; deaths follow by each action's damage delay. A run pauses 5s
 // after its first death.
@@ -53,8 +53,11 @@ public class UmadP3BlackHoleScenarioTests
         o.ThunderSet2 = ThunderIIIAssignment.ShareMtFirst;
     }
 
+    // The tether timeline above is D>S>A's.
+    private const int DpsSupportAccretion = 1;
+
     private static NegativeRun<UmadP3BlackHoleScenario> BlackHole(PartyRole player)
-        => Negative<UmadP3BlackHoleScenario>(player)
+        => Negative<UmadP3BlackHoleScenario>(player, DpsSupportAccretion)
             .Overrides<UmadP3BlackHoleStateOverrides>(Pin);
 
     [TestCase(22f, 10f)]
@@ -119,8 +122,10 @@ public class UmadP3BlackHoleScenarioTests
     // C steps to the far end of OT's beam, beside its own hole so its own beam misses OT, and
     // OT's shot spends C's crust in the same frame as OT's.
     [Test]
+    // Seeded: which line C rolls decides whether it still holds a crust at 101.9 s, and a few rolls
+    // (e.g. 1956819893) leave it without one, so C dies alone and the script never meets its premise.
     public void TwoCrustsSpentTogetherWipe()
-        => BlackHole(CasterDps)
+        => BlackHole(CasterDps).Seed(1)
             .TeleportAt(101.9f, to: new(-16.5f, 2.5f))
             .ShouldKill(ActionId.Earthquake_Cleanse, PerRole.All);
 

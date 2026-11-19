@@ -1,5 +1,6 @@
 using System;
 using AnoMech.Core.Game.Party;
+using AnoMech.Scenarios.Umad.P4KefkaSays;
 using Dalamud.Bindings.ImGui;
 using static AnoMech.Scenarios.Umad.UmadConstants;
 
@@ -17,12 +18,24 @@ public sealed class UmadP3BlackHoleSettingsWindow
     {
 #if DEBUG
         if (ImGui.Button("Auto")) Overrides.SlapAttacks[0] = null;
+#endif
         if (SettingsGrid.Begin("##umadp3blackhole"))
         {
+            DrawWhiteHole();
+#if DEBUG
             DrawFirstSlap();
+#endif
             SettingsGrid.End();
         }
-#endif
+    }
+
+    // As P4's HP check: the sim reads nobody's HP, so whether the party was full is chosen here.
+    private void DrawWhiteHole()
+    {
+        SettingsGrid.Row("White Hole:");
+        if (ImGui.RadioButton("Pass##whitehole", Overrides.HpCheck != HpCheckMode.Fail)) Overrides.HpCheck = HpCheckMode.Pass;
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Fail (petrified)##whitehole", Overrides.HpCheck == HpCheckMode.Fail)) Overrides.HpCheck = HpCheckMode.Fail;
     }
 
     public void DrawPerPlayer()

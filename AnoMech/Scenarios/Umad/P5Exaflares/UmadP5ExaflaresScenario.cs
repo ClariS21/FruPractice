@@ -7,6 +7,7 @@ using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
 using AnoMech.Core.Map;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
 using static AnoMech.Scenarios.Umad.UmadConstants;
 
@@ -17,11 +18,21 @@ namespace AnoMech.Scenarios.Umad.P5Exaflares;
 //
 // Rolling hits are animation-based (no per-tile marker, just the ExaflareOmen lane arrow): each
 // eruption snapshots position as it goes off. Lingering fire is safe - only the snapshot instant kills.
-public sealed class UmadP5ExaflaresScenario : IScenario
+public sealed class UmadP5ExaflaresScenario : IScenario, IUmadHazardSource
 {
+    public UmadHazards GuidanceHazards { get; } = new();
+
+    // Where melee may keep to the boss: the stretches of this scenario's own clock with no cast to dodge, soak or face for 4 s or more.
+    internal static readonly (float From, float To)[] UptimeWindows =
+    [
+        (0f, 6.6f),
+    ];
+    private const float UptimeReach = 2f;
+
     public string Name => "Exaflares";
     public IPhase Phase => UmadZone.P5;
     public bool SupportsSolo => true;
+    public bool SupportsMitigationPractice => true;
 
     public IReadOnlyList<IScenarioAi> AiStrats => [new UmadP5ExaflaresAi()];
 
@@ -48,7 +59,12 @@ public sealed class UmadP5ExaflaresScenario : IScenario
     // UmadP3BlackHoleScenario.LastState.
     public UmadP5ExaflaresState? LastState { get; private set; }
 
-    public void Run(SimWorld worldParam, int? selectedAi) => Play(worldParam, selectedAi, Roll(worldParam), new UmadP5Cast());
+    public void Run(SimWorld worldParam, int? selectedAi)
+    {
+        GuidanceHazards.Clear();
+        foreach (var (from, to) in UptimeWindows) worldParam.Uptime.Allow(from, to, UptimeReach);
+        Play(worldParam, selectedAi, Roll(worldParam), new UmadP5Cast());
+    }
 
     internal UmadP5ExaflaresState Roll(SimWorld worldParam) => new(worldParam.Rng, settingsWindow.Overrides);
 
@@ -63,6 +79,9 @@ public sealed class UmadP5ExaflaresScenario : IScenario
 
         if (selectedAi is { } idx && idx < AiStrats.Count)
             new UmadP5ExaflaresAi { FansOut = !cast.Chained }.Run(state, world);
+        if (!cast.Chained)
+            world.MitPractice.Begin(UmadP5ExaflaresMitigation.Plan(P5Full.UmadP5TankPair.FirstInvuln(party)),
+                new Dictionary<MitSource, Func<SimCharacter?>> { [UmadMitigation.Kefka] = () => kefka });
 
         world.Events.Add(0f, () => kefka = cast.Kefka ??= UmadP5Cast.SpawnKefka(world));
         world.Events.Add(2.89f, () => { if (kefka is { } boss) world.Map.DirectorUpdate(0x80000027U, 0x25U, 0x2U, 0x1BDBU, boss.EntityId); });

@@ -1,4 +1,5 @@
 using System.Numerics;
+using AnoMech.Core.ActBridge;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.Native.Interfaces;
@@ -30,6 +31,10 @@ internal sealed record ScenarioRunOptions
     // Seats the player here instead of the seed's pick, so per-role overrides (PerRoleSetting.Mine) reach it.
     public PartyRole? PlayerRole { get; init; }
 
+    // The player's stand-in takes the Last moment plan on every AiManager move with a deadline, as a human who
+    // always comes late would; the bots keep their own timing.
+    public bool LatePlayer { get; init; }
+
     public IReadOnlyDictionary<PartyRole, JobId>? JobOverrides { get; init; }
 
     // Edits the scenario's SettingsOverrides before the run starts. Runs act as a host, so per-role
@@ -47,6 +52,9 @@ internal sealed record ScenarioRunOptions
 
     // Edits the plugin configuration before the run.
     public Action<Configuration>? Configure { get; init; }
+
+    // Receives the ACT lines the run sends the bridge, emission on.
+    public IActLineSink? ActSink { get; init; }
 }
 
 // From the first player takeover on, the player stops following the AI, as a human who froze there
@@ -83,9 +91,13 @@ internal sealed record ScenarioRun(
         fake.Timeline.Source = () => log.LastFired;
         var role = options.PlayerRole ?? (PartyRole)new Rng(seed).Fork("player-seat").Next(8);
         // A real player's job always fits their seat; job-keyed actions read it.
-        fake.BattleCharas.Player.ClassJob = (byte)(options.JobOverrides?.GetValueOrDefault(role) ?? (JobId)PartyPresets.Standard[(int)role].ClassJob);
+        // A seat the overrides leave out keeps its usual job, as the bots' seats do.
+        fake.BattleCharas.Player.ClassJob = options.JobOverrides is { } overrides && overrides.TryGetValue(role, out var playerJob)
+            ? (byte)playerJob
+            : PartyPresets.Standard[(int)role].ClassJob;
         // The fake's 100k would be a weak character; in game the client's real max HP stands, here the job's, as the bots get.
         fake.BattleCharas.Player.MaxHealth = fake.BattleCharas.Player.Health = AnoMech.Core.Game.PartyHp.JobHealth.RollMaxHealth(fake.BattleCharas.Player.ClassJob, new Rng(seed).Fork("player-health"));
+        var emitter = options.ActSink is { } sink ? ActEmitter.Install(sink, () => true) : null;
         var deaths = new List<Death>();
         var mechanicFailures = new List<MechanicFailure>();
         var announcements = new List<string>();
@@ -119,6 +131,8 @@ internal sealed record ScenarioRun(
         PerRole.ForceSeats = true;
         AoeQuery.Evaluated += OnAoeEvaluated;
         game = new Game();
+        game.World.LatePlayer = options.LatePlayer;
+        emitter?.Attach(game);
         game.World.MovementHabits = ShippedHabits.Value;
         game.World.MitPractice.Enabled = config.MitigationPractice;
         game.World.Announced += text => announcements.Add($"t={game.World.Events.Elapsed:F2} {text}");
@@ -187,6 +201,7 @@ internal sealed record ScenarioRun(
             DebugBotControl.Enabled = false;
             PerRole.ForceSeats = false;
             game.Dispose();
+            emitter?.Uninstall();
         }
         return new ScenarioRun(scenarioType, strat, seed, role, endTime, deaths, mechanicFailures, failure, log.Warnings, artifacts)
         {
@@ -217,6 +232,9 @@ internal sealed record ScenarioRun(
            + $"'TestRunParameters.Parameter(name=\"Scenario\", value=\"{ScenarioType.FullName}\")' "
            + $"'TestRunParameters.Parameter(name=\"Strat\", value=\"{Strat}\")' "
            + $"'TestRunParameters.Parameter(name=\"Seed\", value=\"{Seed}\")'";
+
+    // One more run parameter for ReplayCommand, quoted the same way.
+    public static string ReplayParameter(string name, string value) => $"'TestRunParameters.Parameter(name=\"{name}\", value=\"{value}\")'";
 
     public override string ToString()
     {

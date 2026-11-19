@@ -28,6 +28,10 @@ public sealed record UmadP3Tanks(PartyRole Chaos, PartyRole Exdeath)
     // A job off the list ranks last, so a pair of unknowns keeps the main tank on Chaos.
     private static int Rank(JobId job) => Array.IndexOf(ChaosPriority, job) is var i and >= 0 ? i : ChaosPriority.Length;
 
+    // The boss a seat's bot fights: Decisive Battle's Chaos group is its tank, H1 and both melee; the rest go to Exdeath.
+    public SimEnemy? BossFor(PartyRole role, SimEnemy? chaos, SimEnemy? exdeath)
+        => role == Chaos || role is PartyRole.RegenHealer or PartyRole.MeleeDpsA or PartyRole.MeleeDpsB ? chaos : exdeath;
+
     public ThunderIIIAssignment Seats(UmadP3ThunderPlan plan) => plan switch
     {
         UmadP3ThunderPlan.ChaosTankInvulns => Chaos == PartyRole.MainTank ? ThunderIIIAssignment.MtInvulnsBoth : ThunderIIIAssignment.OtInvulnsBoth,

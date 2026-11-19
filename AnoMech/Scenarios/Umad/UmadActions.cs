@@ -155,6 +155,7 @@ public static class UmadActions
     public static readonly EnemyAction Spellwave = new(UmadConstants.ActionId.Spellwave)
     {
         Cast = new() { AnimationLock = 1.1f },
+        // The sheet gives no cone angle; 90 degrees is estimated from the animation.
         Area = new() { Size = MathF.PI / 4, ExcludeCaster = true },
         Effects = [Damage(MagicVulns), LongMagicVulnerabilityUp],
         Timing = new() { DamageDelay = 0.62f },
@@ -183,7 +184,7 @@ public static class UmadActions
         Timing = new() { DamageDelay = 0.48f },
     };
 
-    // Half-angle estimated from the animation.
+    // The sheet gives no cone angle: half-angle estimated from the animation.
     private const float SlapConeHalfAngle = MathF.PI / 6;
 
     public static readonly EnemyAction ShockwaveCone = new(UmadConstants.ActionId.ShockwaveCone)
@@ -230,6 +231,7 @@ public static class UmadActions
     public static readonly EnemyAction ImplosionShockwave = new(UmadConstants.ActionId.Shockwave)
     {
         Cast = new() { AnimationLock = 1.1f },
+        // The sheet gives no cone angle; 90 degrees is estimated from the animation.
         Area = new() { Size = MathF.PI / 4 },
         Effects = [Damage(MagicVulns, Lethal)],
         Timing = new() { DamageDelay = 0.49f },
@@ -295,6 +297,13 @@ public static class UmadActions
         Timing = new() { DamageDelay = 1.43f },
     };
 
+    // The same hit on a party the healers didn't bring to full HP: it petrifies whoever it finds short.
+    // UNVERIFIED: shown with the resolve, as retail shows stuns; no clean pull logged a petrification.
+    public static readonly EnemyAction WhiteHoleOnAHurtParty = WhiteHole with
+    {
+        Effects = [Damage(Harmless, kindOverride: DamageKind.Typeless), ApplyStatus(UmadConstants.StatusId.Petrification, 3f)],
+    };
+
     public static readonly EnemyAction Nothingness = new(UmadConstants.ActionId.Nothingness)
     {
         Cast = new() { AnimationLock = 1.1f },
@@ -314,7 +323,7 @@ public static class UmadActions
     private static readonly IEnemyActionEffect StrayVulnerabilityUp =
         ApplyStatus(UmadConstants.StatusId.MagicVulnerabilityUp, 3.96f);
 
-    // UNVERIFIED: the inner radius of the r=10 donuts.
+    // UNVERIFIED: the inner radius of the r=10 donuts; the sheet's x-axis modifier is 0, so it does not say.
     private const float CrystalDonutInnerRadius = 5f;
 
     // UNVERIFIED: how far the crystals throw; nobody in a clean pull was thrown.
@@ -498,6 +507,7 @@ public static class UmadActions
     private static EnemyAction MysteryBlizzard(uint actionId) => new(actionId)
     {
         Cast = new() { AnimationLock = 1.1f },
+        // The sheet gives no cone angle; 90 degrees is estimated from the animation.
         Area = new() { Size = MathF.PI / 4 },
         Effects = [Damage(MagicVulns, Lethal)],
         Timing = new() { DamageDelay = 0.93f },
@@ -774,12 +784,14 @@ public static class UmadActions
         Timing = new() { DamageDelay = 0.8f },
     };
 
-    // UNVERIFIED delays: no clear stands in either.
+    // No clear stands in a black hole or the orange, so the logs have no damage for either. Their
+    // 5 s bars snapshot 0.3 s before the ActionEffect and an AoE's damage follows that by about 0.63 s
+    // (Bonds), so 0.93 s from the bar's end, like the other bar-cast AoEs (Stray Spray, Tsunami).
     public static readonly EnemyAction ForsakenGround = new(UmadConstants.ActionId.ForsakenGround)
     {
         Cast = new() { AnimationLock = 1.1f },
         Effects = [Damage(Lethal)],
-        Timing = new() { DamageDelay = 0.62f },
+        Timing = new() { DamageDelay = 0.93f },
         DeathExplanation = "caught in a black hole: Forsaken",
     };
 
@@ -787,7 +799,7 @@ public static class UmadActions
     {
         Cast = new() { AnimationLock = 1.1f },
         Effects = [Damage(Lethal)],
-        Timing = new() { DamageDelay = 0.62f },
+        Timing = new() { DamageDelay = 0.93f },
         DeathExplanation = "caught in the orange: Forsaken",
     };
 

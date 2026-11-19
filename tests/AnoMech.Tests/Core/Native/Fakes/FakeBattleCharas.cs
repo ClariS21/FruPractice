@@ -102,6 +102,8 @@ internal sealed class FakeBattleCharas : IBattleCharas
             HasDrawObject = true,
             IsDrawObjectVisible = config.Visibility == SpawnVisibility.Visible,
         };
+        // A tether in the spawn packet lands in slot 0, as a SetTether would.
+        if (config.TetherId != 0) actor.Tethers[0] = config.TetherId;
         Place(slot, actor);
         Timeline.Add("spawn", entityId, name, config.BNpcBaseId.ToString(), "BNpcBase", position: placement.Position,
             rotation: placement.Rotation,

@@ -169,6 +169,9 @@ internal sealed class FakeBattleChara(FakeBattleCharas owner, int slot) : IBattl
             case 0x3F: // ModelState
                 if (Actor is { } a) a.ModelState = (byte)arg1;
                 break;
+            case 0x62: // name, p1 = BNpcName row: a pooled helper takes the name of the boss it casts for
+                if (Actor is { } named) named.Name = Natives.Data.BNpcName(arg1) ?? "";
+                break;
             case 0x23: // tether, slot 0
                 if (Actor is { } tethered) tethered.Tethers[0] = (ushort)arg2;
                 break;

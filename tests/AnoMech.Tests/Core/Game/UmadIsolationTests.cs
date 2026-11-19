@@ -18,7 +18,6 @@ public class UmadIsolationTests
         public void Send(string line) => Lines.Add(line);
     }
 
-    // DMU runs the calibrated layers but ACT emission, which writes FRU's director lines.
     [Test]
     public void UmadRestartKeepsItsPoolAndItsCalibration()
     {
@@ -44,10 +43,10 @@ public class UmadIsolationTests
                 Assert.Multiple(() =>
                 {
                     Assert.That(game.World.Children.OfType<SimEnemy>().Count(e => e.BNpcBaseId == 9020), Is.EqualTo(37));
-                    Assert.That(game.World.Calibration, Is.SameAs(UmadZone.Instance.Calibration));
+                    Assert.That(game.World.Calibration, Is.SameAs(((IZone)UmadZone.Instance).Calibration));
                     Assert.That(game.World.HabitFor(PartyRole.MainTank), Is.Not.Null);
                     Assert.That(game.World.PartyHp.RollTickDelay(), Is.InRange(PartyHp.TickDelayMin, PartyHp.TickDelayMax));
-                    Assert.That(game.World.MitPractice.IsActive, Is.False);
+                    Assert.That(game.World.MitPractice.IsActive, Is.True, "DMU's mitigation plan runs again on a restart");
                     Assert.That(game.Guidance.Recording || game.Guidance.Debrief is not null, Is.True, "the path guide followed the run");
                     Assert.That(game.World.Strat.Entries.Any(s => s.Role == PartyRole.MeleeDpsA), Is.True, "the player's strat spots are on the trail");
                     Assert.That(((IScenario)scenario).BurstAnchors, Is.Empty);
@@ -56,7 +55,7 @@ public class UmadIsolationTests
             game.Dispose();
             Assert.Multiple(() =>
             {
-                Assert.That(sink.Lines, Is.Empty);
+                Assert.That(sink.Lines, Has.Some.StartsWith("33|800375D2|40000006|"));
                 Assert.That(exhausted, Is.Empty);
                 Assert.That(game.World.Children, Is.Empty);
             });

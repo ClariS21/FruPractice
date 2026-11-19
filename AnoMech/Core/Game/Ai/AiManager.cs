@@ -84,6 +84,8 @@ public sealed class AiManager
                 var member = world.Party.Get(i);
                 if (member == null || !member.IsAlive()) continue;
                 var seat = (PartyRole)i;
+                // A test's late player: the human's seat leaves at the last moment that still makes the deadline.
+                var late = world.LatePlayer && arrivalTime is not null && seat == world.Party.PlayerRole;
                 var spot = new Vector3(local.X, 0f, local.Y);
                 world.Strat.Record(new StratTarget(seat, spot, world.Events.Elapsed, startedAt + arrivalTime,
                     cue?.Mechanic, cue?.Why(seat), cue?.Source));
@@ -116,7 +118,8 @@ public sealed class AiManager
                 else if (!lastMoment && arrivalTime is not null && !hold)
                 {
                     var reaction = MathF.Max(0.15f, world.AiReactionBase(seat) + (world.Stream("ai-reaction").NextSingle() - 0.5f) * 0.5f);
-                    delay = MathF.Min(delay, reaction);
+                    // The late player still draws, so the bots' reactions match a normal run of the seed.
+                    if (!late) delay = MathF.Min(delay, reaction);
                 }
                 else if (lastMoment && !hold)
                     delay *= 1f - Math.Clamp(settleFraction, 0f, 1f);

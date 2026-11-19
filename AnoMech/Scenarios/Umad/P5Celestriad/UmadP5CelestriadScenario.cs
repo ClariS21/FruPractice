@@ -6,6 +6,7 @@ using System.Numerics;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
 using static AnoMech.Scenarios.Umad.UmadConstants;
 
@@ -20,11 +21,15 @@ namespace AnoMech.Scenarios.Umad.P5Celestriad;
 // second active tower. Sets 0 and 2 (the 1st and 3rd soaks) each get a single Catastrophic
 // Choice cast while their towers are lit. A set's towers go off about 0.6s after that cast
 // lands, and the Choice's Quake or Tornado 0.2-0.3s after the towers.
-public sealed class UmadP5CelestriadScenario : IScenario
+public sealed class UmadP5CelestriadScenario : IScenario, IUmadHazardSource
 {
+    public UmadHazards GuidanceHazards { get; } = new();
+
+
     public string Name => "Celestriad";
     public IPhase Phase => UmadZone.P5;
     public bool SupportsSolo => false;
+    public bool SupportsMitigationPractice => true;
 
     public IReadOnlyList<IScenarioAi> AiStrats => [new UmadP5CelestriadAi()];
 
@@ -45,7 +50,11 @@ public sealed class UmadP5CelestriadScenario : IScenario
     // Aligned with state.AllTowers: active-tower selections use those indices.
     private readonly List<SimEventObject?> towers = [];
 
-    public void Run(SimWorld worldParam, int? selectedAi) => Play(worldParam, selectedAi, Roll(worldParam), new UmadP5Cast());
+    public void Run(SimWorld worldParam, int? selectedAi)
+    {
+        GuidanceHazards.Clear();
+        Play(worldParam, selectedAi, Roll(worldParam), new UmadP5Cast());
+    }
 
     internal UmadP5CelestriadState Roll(SimWorld worldParam) => new(worldParam.Rng, worldParam.Party, settingsWindow.Overrides);
 
@@ -59,6 +68,9 @@ public sealed class UmadP5CelestriadScenario : IScenario
 
         if (selectedAi is { } idx && idx < AiStrats.Count)
             ((IScenarioAi<UmadP5CelestriadState>)AiStrats[idx]).Run(state, world);
+        if (!cast.Chained)
+            world.MitPractice.Begin(UmadP5CelestriadMitigation.Plan(P5Full.UmadP5TankPair.FirstInvuln(party)),
+                new Dictionary<MitSource, Func<SimCharacter?>> { [UmadMitigation.Kefka] = () => kefka });
 
         world.Events.Add(0f, () => kefka = cast.Kefka ??= UmadP5Cast.SpawnKefka(world));
         world.Events.Add(1.0f, () => kefka?.Cast(ActionId.Celestriad, animationLock: 3.1f));

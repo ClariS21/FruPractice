@@ -15,9 +15,10 @@ public enum SheetColumn { MT, OT, WHM, AST, SCH, SGE, D1, D2, D3, D4, Extras }
 // row to those jobs; On is the boss a debuff goes on, when not the plan's DebuffTarget; Buddy aims
 // a single-target button (Intervention, Nascent Flash) at the other tank; ForBaiter keeps the row
 // to the one slot the plan's Baiter names, once the run knows it; Partners keeps a tank row to
-// comps where the other tank's job is one of them (the sheet's tank-pair tabs).
+// comps where the other tank's job is one of them (the sheet's tank-pair tabs); Target aims a
+// single-target button at that seat (a healer's, at whichever tank takes the hit).
 public sealed record MitPlanEntry(SheetColumn Column, uint ActionId, float At, string Label, float[] Covers, JobId[]? Jobs = null,
-    MitSource? On = null, bool Buddy = false, bool ForBaiter = false, JobId[]? Partners = null)
+    MitSource? On = null, bool Buddy = false, bool ForBaiter = false, JobId[]? Partners = null, PartyRole? Target = null)
 {
     // Placeholder buttons, resolved per job by MitCatalogue.For.
     public const uint PartyMit = 0;

@@ -11,6 +11,9 @@ namespace AnoMech.Scenarios.Umad;
 // (CastType / EffectRange / XAxisModifier / Cast100ms from the Action sheet).
 public static class UmadConstants
 {
+    // The duty director's EventId, which retail's director lines and director-bound EObjs carry.
+    public const uint DirectorEventId = 0x800375D2U;
+
     public static class BNpcBaseId
     {
         public const uint Kefka       = 18475; // "Kefka Says" boss (P4); distinct row from GodKefka (19506) and KefkaP3 (19504)
@@ -69,6 +72,9 @@ public static class UmadConstants
         public const uint GazeStatueNormal   = 2015166; // NE, IndolentWill
         public const uint GazeStatueInverted = 2015167; // NW, AveMaria
         public const uint TelePortent        = 2015267;
+        // cactbot reads the crystals' BNpcIDs (1EC03A to 1EC03C) from memory to call their spots.
+        public const uint FireCrystal        = 2015290;
+        public const uint WaterCrystal       = 2015291;
         public const uint WindCrystal        = 2015292;
         public const uint EarthCore          = 2015293;
         public const uint CelestriadFireTower      = 2015294;
@@ -105,7 +111,7 @@ public static class UmadConstants
         public const ushort GazeStatueSpawnState = 0x0004;
 
         // The InstanceContentDirector these props bind to; their EObj rows are Invisibility=7.
-        public const uint PropEventId = 0x800375D2U;
+        public const uint PropEventId = DirectorEventId;
     }
 
     public static class EObjState
@@ -323,6 +329,7 @@ public static class UmadConstants
         public const ushort FirstInLine               = (ushort)0xBBC;
         public const ushort SecondInLine              = (ushort)0xBBD;
         public const ushort ThirdInLine               = (ushort)0xBBE;
+        public const ushort Petrification             = (ushort)0xBBF;
         public const ushort EarthResistanceDownII     = (ushort)0xD2C;
         public const ushort DeepFreeze                = (ushort)0xD98;
         public const ushort DirectionalDisregard      = (ushort)0xEE0;

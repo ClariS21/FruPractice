@@ -99,28 +99,31 @@ internal sealed class UmadP5Forsaken
 
     internal static float PuddleRadius => Natives.Data.Action(ActionId.ForsakenGround)?.EffectRange ?? 8f;
 
-    public void Schedule(SimWorld worldParam, UmadP5Cast castParam, IReadOnlyList<UmadP5ForsakenRoll> rolls)
+    // `origin` is the clock time the run's own zero stands for: 0 inside the full phase, and the
+    // standalone drill starts a little before the raidwide.
+    public void Schedule(SimWorld worldParam, UmadP5Cast castParam, IReadOnlyList<UmadP5ForsakenRoll> rolls, float origin = 0f)
     {
         world = worldParam;
         cast = castParam;
         voids.Clear();
         forsaken.Clear();
-        world.Events.Add(RaidwideAt, () => cast.Kefka?.Cast(UmadActions.ForsakenP5));
-        world.Events.Add(RaidwideAt, () => BattleTalk(0x28));
+        void At(float time, Action action) => world.Events.Add(time - origin, action);
+        At(RaidwideAt, () => cast.Kefka?.Cast(UmadActions.ForsakenP5));
+        At(RaidwideAt, () => BattleTalk(0x28));
         for (var set = 0; set < MarkerAt.Length; set++)
         {
             var s = set;
-            if (s > 0) world.Events.Add(MarkerAt[s], () => cast.Kefka?.Cast(UmadActions.ForsakenP5Raidwide));
-            if (s > 0) world.Events.Add(MarkerAt[s], () => BattleTalk((uint)(0x28 + s)));
-            world.Events.Add(MarkerAt[s], () => Marker(rolls[s])?.AttachLockonVfx(LockonId.Stack));
-            if (s == 0) world.Events.Add(MarkerAt[s], () => cast.Kefka?.AddStatus(StatusId.DirectionalDisregard));
-            world.Events.Add(PuddlesAt[s], () => DropPuddles(s, rolls[s]));
-            world.Events.Add(MarkerAt[s] + SetEffectAfterMarker, () => world.Map.AddEffect(packetFlags: 0x00200010U, index: SetEffect[s]));
-            world.Events.Add(BondsAt[s], () => Bonds(rolls[s]));
+            if (s > 0) At(MarkerAt[s], () => cast.Kefka?.Cast(UmadActions.ForsakenP5Raidwide));
+            if (s > 0) At(MarkerAt[s], () => BattleTalk((uint)(0x28 + s)));
+            At(MarkerAt[s], () => Marker(rolls[s])?.AttachLockonVfx(LockonId.Stack));
+            if (s == 0) At(MarkerAt[s], () => cast.Kefka?.AddStatus(StatusId.DirectionalDisregard));
+            At(PuddlesAt[s], () => DropPuddles(s, rolls[s]));
+            At(MarkerAt[s] + SetEffectAfterMarker, () => world.Map.AddEffect(packetFlags: 0x00200010U, index: SetEffect[s]));
+            At(BondsAt[s], () => Bonds(rolls[s]));
         }
-        world.Events.Add(NullAt, () => cast.Kefka?.Cast(ActionId.ForsakenNull, animationLock: 3.1f));
-        world.Events.Add(NullAt + 0.85f, ClearSetEffects);
-        world.Events.Add(NullAt + 4.37f, () => BattleTalk(0x2C));
+        At(NullAt, () => cast.Kefka?.Cast(ActionId.ForsakenNull, animationLock: 3.1f));
+        At(NullAt + 0.85f, ClearSetEffects);
+        At(NullAt + 4.37f, () => BattleTalk(0x2C));
     }
 
     // Kefka's lines, as retail's director sends them.

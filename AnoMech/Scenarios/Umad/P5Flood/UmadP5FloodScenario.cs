@@ -5,6 +5,7 @@ using AnoMech.Core;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.Map;
 using AnoMech.Core.SimObjects;
 using static AnoMech.Scenarios.Umad.UmadConstants;
@@ -17,13 +18,23 @@ namespace AnoMech.Scenarios.Umad.P5Flood;
 // lines each march across the arena through 4 fixed points over 4 ticks (~1.02s apart), one
 // diagonal per tick, alternating; each tick also lands ChaoticFlood, a 6y stack on a random
 // non-tank.
-public sealed class UmadP5FloodScenario : IScenario
+public sealed class UmadP5FloodScenario : IScenario, IUmadHazardSource
 {
+    public UmadHazards GuidanceHazards { get; } = new();
+
+    // Where melee may keep to the boss: the stretches of this scenario's own clock with no cast to dodge, soak or face for 4 s or more.
+    internal static readonly (float From, float To)[] UptimeWindows =
+    [
+        (0f, 6f),
+    ];
+    private const float UptimeReach = 2f;
+
     public string Name => "Flood";
     public IPhase Phase => UmadZone.P5;
     // The real track starts 39.83s before the Flood cast.
     public float BgmSecondsAtStart => 38.83f;
     public bool SupportsSolo => true;
+    public bool SupportsMitigationPractice => true;
     public IReadOnlyList<IScenarioAi> AiStrats => [new UmadP5FloodAi()];
 
     public void DrawSettings() => settingsWindow.Draw();
@@ -97,7 +108,12 @@ public sealed class UmadP5FloodScenario : IScenario
 
     public UmadP5FloodState? LastState { get; private set; }
 
-    public void Run(SimWorld worldParam, int? selectedAi) => Play(worldParam, selectedAi, Roll(worldParam), new UmadP5Cast());
+    public void Run(SimWorld worldParam, int? selectedAi)
+    {
+        GuidanceHazards.Clear();
+        foreach (var (from, to) in UptimeWindows) worldParam.Uptime.Allow(from, to, UptimeReach);
+        Play(worldParam, selectedAi, Roll(worldParam), new UmadP5Cast());
+    }
 
     internal UmadP5FloodState Roll(SimWorld worldParam) => new(worldParam.Rng, settingsWindow.Overrides);
 
@@ -111,6 +127,8 @@ public sealed class UmadP5FloodScenario : IScenario
 
         if (selectedAi is { } idx && idx < AiStrats.Count)
             ((IScenarioAi<UmadP5FloodState>)AiStrats[idx]).Run(state, world);
+        if (!cast.Chained)
+            world.MitPractice.Begin(UmadP5FloodMitigation.Plan(), new Dictionary<MitSource, Func<SimCharacter?>> { [UmadMitigation.Kefka] = () => kefka });
 
         world.Events.Add(0f, () => kefka = cast.Kefka ??= UmadP5Cast.SpawnKefka(world));
         world.Events.Add(FloodCastStart, () => kefka?.Cast(ActionId.FloodCast, animationLock: FloodCastAnimationLock));

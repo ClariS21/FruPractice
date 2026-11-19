@@ -40,6 +40,26 @@ internal static class MitigationPlanAssert
     // endsAt is the scenario's end, when a press with nothing to cover there can come after its last hit.
     public static void IsSound(MitPlanData data, string scenario, float? endsAt = null)
     {
+        HasSoundRows(data, scenario, endsAt);
+        foreach (var (name, jobs) in Comps()) HoldsFor(data, scenario, name, jobs);
+    }
+
+    // A plan built for each comp's own pair (DMU's tank columns follow the boss a tank holds): each
+    // one holds for its comp, and none has a row the job in its column could press that resolves
+    // for nobody.
+    public static void IsSound(Func<IReadOnlyDictionary<PartyRole, JobId>, MitPlanData> planFor, string scenario, float? endsAt = null)
+    {
+        foreach (var (name, jobs) in Comps())
+        {
+            var data = planFor(jobs);
+            HasSoundRows(data, $"{scenario}, {name}", endsAt);
+            HoldsFor(data, scenario, name, jobs);
+            HasNoOrphans(data, scenario, name, jobs);
+        }
+    }
+
+    private static void HasSoundRows(MitPlanData data, string scenario, float? endsAt)
+    {
         var scheduled = data.Schedule.Select(s => s.At).ToList();
         var lastHit = scheduled.Max();
         foreach (var hit in data.Schedule.SelectMany(s => s.Keys))
@@ -59,13 +79,39 @@ internal static class MitigationPlanAssert
             }
             if (e.IsExtra) Assert.That(e.Jobs, Is.Not.Null.And.Not.Empty, $"{context}: an Extras row names its jobs");
         }
+    }
 
-        foreach (var (name, jobs) in Comps())
+    private static void HoldsFor(MitPlanData data, string scenario, string name, Dictionary<PartyRole, JobId> jobs)
+    {
+        var plan = MitPlan.Resolve(data.Entries, jobs);
+        Assert.That(MitPlan.Validate(plan), Is.Empty, $"{scenario}, {name}");
+        foreach (var extra in plan.Where(p => p.IsExtra))
+            Assert.That(extra.Job, Is.AnyOf(Machinist, RedMage, Pictomancer), $"{scenario}, {name}: {extra.Action.Name}");
+    }
+
+    private static void HasNoOrphans(MitPlanData data, string scenario, string name, Dictionary<PartyRole, JobId> jobs)
+    {
+        var resolved = MitPlan.Resolve(data.Entries, jobs).Select(p => p.Entry).ToHashSet();
+        for (var i = 0; i < data.Entries.Count; i++)
         {
-            var plan = MitPlan.Resolve(data.Entries, jobs);
-            Assert.That(MitPlan.Validate(plan), Is.Empty, $"{scenario}, {name}");
-            foreach (var extra in plan.Where(p => p.IsExtra))
-                Assert.That(extra.Job, Is.AnyOf(Machinist, RedMage, Pictomancer), $"{scenario}, {name}: {extra.Action.Name}");
+            var e = data.Entries[i];
+            if (resolved.Contains(i)) continue;
+            IEnumerable<JobId> holders = e.Column switch
+            {
+                SheetColumn.MT => [jobs[PartyRole.MainTank]],
+                SheetColumn.OT => [jobs[PartyRole.OffTank]],
+                SheetColumn.D1 => [jobs[PartyRole.MeleeDpsA]],
+                SheetColumn.D2 => [jobs[PartyRole.MeleeDpsB]],
+                SheetColumn.D3 => [jobs[PartyRole.PhysRangedDps]],
+                SheetColumn.D4 => [jobs[PartyRole.CasterDps]],
+                SheetColumn.WHM => jobs.Values.Where(j => j == WhiteMage),
+                SheetColumn.AST => jobs.Values.Where(j => j == Astrologian),
+                SheetColumn.SCH => jobs.Values.Where(j => j == Scholar),
+                SheetColumn.SGE => jobs.Values.Where(j => j == Sage),
+                _ => jobs.Values,
+            };
+            Assert.That(holders.Any(job => e.Jobs is null || e.Jobs.Contains(job)), Is.False,
+                $"{scenario}, {name}: {e.Column} {e.ActionId} at {e.At} ({e.Label}) resolves for nobody");
         }
     }
 }

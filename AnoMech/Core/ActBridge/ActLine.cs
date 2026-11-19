@@ -23,6 +23,7 @@ internal static class ActLine
     private static string Hex(uint value) => value.ToString("X", CultureInfo.InvariantCulture);
     private static string Hex(uint value, int digits) => value.ToString("X" + digits, CultureInfo.InvariantCulture);
     private static string F(float value) => value.ToString("F2", CultureInfo.InvariantCulture);
+    private static string F3(float value) => value.ToString("F3", CultureInfo.InvariantCulture);
     private static string Dec(uint value) => value.ToString(CultureInfo.InvariantCulture);
 
     private static string Name(ActLineActor actor) => actor.Id is 0 or NoActor ? "" : actor.Name;
@@ -59,13 +60,15 @@ internal static class ActLine
     public static string WasDefeated(ActLineActor target, ActLineActor source)
         => $"25|{Id(target.Id)}|{target.Name}|{Id(source.Id)}|{Name(source)}";
 
+    // The count field is the status's whole param, at least two hex digits: stacks for most, a VFX id
+    // for some (Kefka's 808 carries 45F to 462).
     public static string GainsEffect(ushort statusId, string status, float duration, ActLineActor source, ActLineActor target, ushort param)
         => $"26|{Hex(statusId)}|{status}|{F(duration)}|{Id(source.Id)}|{Name(source)}|{Id(target.Id)}|{target.Name}"
-           + $"|{Hex(param & 0xFFu, 2)}|{Dec(target.MaxHp)}|{Dec(source.MaxHp)}";
+           + $"|{Hex(param, 2)}|{Dec(target.MaxHp)}|{Dec(source.MaxHp)}";
 
     public static string LosesEffect(ushort statusId, string status, ActLineActor source, ActLineActor target, ushort param)
         => $"30|{Hex(statusId)}|{status}|0.00|{Id(source.Id)}|{Name(source)}|{Id(target.Id)}|{target.Name}"
-           + $"|{Hex(param & 0xFFu, 2)}|{Dec(target.MaxHp)}|{Dec(source.MaxHp)}";
+           + $"|{Hex(param, 2)}|{Dec(target.MaxHp)}|{Dec(source.MaxHp)}";
 
     public static string ActorControl(uint directorId, uint command, uint data0 = 0)
         => $"33|{Id(directorId)}|{Hex(command, 8)}|{Hex(data0, 2)}|00|00|00";
@@ -90,4 +93,16 @@ internal static class ActLine
 
     public static string ActorControlExtra(uint id, uint category, uint param1, uint param2, uint param3, uint param4)
         => $"273|{Id(id)}|{Hex(category, 4)}|{Hex(param1)}|{Hex(param2)}|{Hex(param3)}|{Hex(param4)}";
+
+    // OverlayPlugin's line for every ActionEffect packet, after its 21/22 lines. Only the multi-target
+    // packet carries a location (dataFlag 1); the heading is the packet's rotation either way.
+    public static string AbilityExtra(uint sourceId, uint actionId, uint sequence, Vector3? location, float heading, uint animationTargetId)
+        => $"264|{Id(sourceId)}|{Hex(actionId, 4)}|{Hex(sequence, 8)}|"
+           + (location is { } at ? $"1|{F3(at.X)}|{F3(at.Y)}|{F3(at.Z)}" : "0|||")
+           + $"|{F3(heading)}|{Id(animationTargetId)}";
+
+    // OverlayPlugin's line for every NPC spawn packet: the tether and animation state the actor
+    // spawns with, which then get no 35 or 273 of their own.
+    public static string SpawnNpcExtra(uint id, uint parentId, ushort tetherId, byte animationState)
+        => $"272|{Id(id)}|{Id(parentId)}|{Hex(tetherId, 4)}|{Hex(animationState, 2)}";
 }

@@ -32,9 +32,12 @@ public static class MitPlanChain
 
     // Each slice's plan counts on its buttons being up at its own start. One a slice before
     // pressed too recently goes out as soon as it's back, still in time for its hits, or not at all.
+    // Only a row the same seat could have pressed counts: another job's or another tank pair's row
+    // for the same button (a sheet's per-job kitchen sinks, its tank-pair tabs) is never this one's.
     private static MitPlanEntry? WhenBackUp(MitPlanEntry entry, IReadOnlyList<MitPlanEntry> earlier, float sliceEnd)
     {
-        var last = earlier.LastOrDefault(e => e.Column == entry.Column && e.ActionId == entry.ActionId);
+        var last = earlier.LastOrDefault(e => e.Column == entry.Column && e.ActionId == entry.ActionId
+                                              && Overlap(e.Jobs, entry.Jobs) && Overlap(e.Partners, entry.Partners));
         if (last == null) return entry;
         var backUpAt = last.At + Recast(entry.ActionId);
         if (entry.At >= backUpAt) return entry;
@@ -43,6 +46,9 @@ public static class MitPlanChain
         if (entry.Covers.Length > 0 && covers.Length == 0) return null;
         return entry with { At = backUpAt, Covers = covers };
     }
+
+    // Whether some job passes both filters; a row without one passes every job.
+    private static bool Overlap(JobId[]? a, JobId[]? b) => a is null || b is null || a.Intersect(b).Any();
 
     // The longest any job's version of the button takes, for a placeholder.
     private static float Recast(uint actionId)

@@ -111,7 +111,7 @@ internal sealed class UptimeMovement(SimWorld world)
         if (role == PartyRole.MainTank || role == world.Party.PlayerRole) return false;
         if (world.BotTiming != BotTiming.HumanLike || world.BotCombatHalted || !world.BotCombatEnabled) return false;
         // Uptime is fighting behaviour: no target, no uptime.
-        if (world.Party.Combat?.FindTarget() is null) return false;
+        if (world.Party.Combat?.FindTarget(role) is null) return false;
         if (!world.Movement.TryStratAnchor(role, out bot, out anchor, out settledAt)) return false;
         if (!bot.IsAlive() || now - settledAt < SettledFor) return false;
         due = world.Departures.NextStratAfter(now, role);
@@ -122,7 +122,7 @@ internal sealed class UptimeMovement(SimWorld world)
     private bool Applies(PartyRole role, SimPartyNpc bot, Vector3 anchor)
     {
         if (!IsMelee(role)) return true;
-        return world.Party.Combat?.FindTarget() is { } boss && Flat(anchor, boss.Position) <= boss.HitboxRadius + MeleeAimMax + Reach;
+        return world.Party.Combat?.FindTarget(role) is { } boss && Flat(anchor, boss.Position) <= boss.HitboxRadius + MeleeAimMax + Reach;
     }
 
     private static bool IsMelee(PartyRole role) => SimWorld.HabitRoleOf(role) == HabitRole.Melee;
@@ -168,7 +168,7 @@ internal sealed class UptimeMovement(SimWorld world)
     private void TickMelee(Seat seat, PartyRole role, SimPartyNpc bot, Vector3 anchor, float? due, float now, HabitMetrics metrics, Rng rng)
     {
         seat.NextAt = now + MeleePoll;
-        if (world.Party.Combat?.FindTarget() is not { } boss) return;
+        if (world.Party.Combat?.FindTarget(role) is not { } boss) return;
         if (now >= seat.NextSwitchAt)
         {
             // Rear and flank take turns; a flank is either side.

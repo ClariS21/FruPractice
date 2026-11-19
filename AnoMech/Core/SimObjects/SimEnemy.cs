@@ -75,7 +75,11 @@ public record struct EnemySpawnConfig(
     IReadOnlyList<SpawnStatus>? Statuses = null,
     byte ModelState = 0,
     // ModelScale row; retail sends 0 for most BNpcs.
-    byte ModelScale = 0);
+    byte ModelScale = 0,
+    // A tether the spawn packet already carries, drawn to TetherTargetId: retail spawns some actors
+    // tethered (DMU's black holes) rather than tethering them after.
+    ushort TetherId = 0,
+    uint TetherTargetId = 0xE0000000);
 
 public readonly record struct SpawnStatus(ushort StatusId, ushort Param = 0);
 

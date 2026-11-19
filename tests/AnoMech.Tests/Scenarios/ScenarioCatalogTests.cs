@@ -1,4 +1,5 @@
 using AnoMech.Core.Game;
+using AnoMech.Core.Game.Party;
 using AnoMech.Scenarios;
 
 namespace AnoMech.Tests;
@@ -24,15 +25,15 @@ public class ScenarioCatalogTests
             ("Futures Rewritten", "P5", "Fulgent Blade", "Standard"),
             ("Futures Rewritten", "P5", "Paradise Regained", "H first / M1-R1 NW / M2-R2 NE; lines T-M-R-H"),
             ("Futures Rewritten", "P5", "Full phase", "Standard · H first / M1-R1 NW / M2-R2 NE; lines T-M-R-H"),
-            ("Dancing Mad (Ultimate)", "P3", "Black Hole", "Black Hole: D>S>A | Black Hole: S>D>A"),
+            ("Dancing Mad (Ultimate)", "P3", "Black Hole", "Black Hole: By line number | Black Hole: D>S>A | Black Hole: S>D>A"),
             ("Dancing Mad (Ultimate)", "P3", "Limit Cut", "Standard"),
-            ("Dancing Mad (Ultimate)", "P3", "Full phase", "Standard · Black Hole: D>S>A"),
+            ("Dancing Mad (Ultimate)", "P3", "Full phase", "Standard · Black Hole: By line number | Standard · Black Hole: D>S>A | Standard · Black Hole: S>D>A"),
             ("Dancing Mad (Ultimate)", "P4", "Kefka Says", "Kefka Says, gazes: supports N / DPS S | Kefka Says"),
             ("Dancing Mad (Ultimate)", "P4", "Full phase", "Kefka Says, gazes: supports N / DPS S | Kefka Says"),
             ("Dancing Mad (Ultimate)", "P5", "Celestriad", "Standard"),
             ("Dancing Mad (Ultimate)", "P5", "Exaflares", "Spread"),
             ("Dancing Mad (Ultimate)", "P5", "Flood", "Rotate"),
-            ("Dancing Mad (Ultimate)", "P5", "Forsaken Null", ""),
+            ("Dancing Mad (Ultimate)", "P5", "Forsaken Null", "Waymarks clockwise past the orange"),
             ("Dancing Mad (Ultimate)", "P5", "Full phase", "Role stacks, Omnitank · Rotate · Standard · Spread"),
         }));
     }
@@ -74,8 +75,8 @@ public class ScenarioCatalogTests
         Assert.That(run.Passed, run.ToString);
     }
 
-    // Replay driven by run parameters (Scenario = type full name, Strat, Seed, optional StopAt);
-    // ScenarioRun.ReplayCommand prints the invocation.
+    // Replay driven by run parameters (Scenario = type full name, Strat, Seed, optional StopAt, Seat = a PartyRole and
+    // LatePlayer); ScenarioRun.ReplayCommand prints the invocation.
     [Explicit]
     [Test]
     public void ReplayFromParameters()
@@ -84,8 +85,9 @@ public class ScenarioCatalogTests
         var scenarioType = name is null ? null : typeof(Game).Assembly.GetType(name);
         Assert.That(scenarioType, Is.Not.Null, $"Scenario parameter '{name}' is not a scenario type's full name.");
         var stopAt = TestContext.Parameters.Get("StopAt") is { } text ? float.Parse(text, System.Globalization.CultureInfo.InvariantCulture) : (float?)null;
+        var seat = TestContext.Parameters.Get("Seat") is { } role ? Enum.Parse<PartyRole>(role) : (PartyRole?)null;
         var run = ScenarioRun.Execute(scenarioType!, TestContext.Parameters.Get("Strat", 0), TestContext.Parameters.Get("Seed", 0),
-            new ScenarioRunOptions { AlwaysWriteArtifacts = true, StopAt = stopAt });
+            new ScenarioRunOptions { AlwaysWriteArtifacts = true, StopAt = stopAt, PlayerRole = seat, LatePlayer = TestContext.Parameters.Get("LatePlayer", false) });
         Assert.That(run.Passed, run.ToString);
     }
 }

@@ -13,16 +13,30 @@ using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
 using AnoMech.Core.Game.Geometry;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.Map;
 using AnoMech.Core.SimObjects;
+using AnoMech.Scenarios.Umad.P4KefkaSays;
 using static AnoMech.Scenarios.Umad.UmadConstants;
 
 namespace AnoMech.Scenarios.Umad.P3BlackHole;
 
-public sealed class UmadP3BlackHoleScenario : IScenario
+public sealed class UmadP3BlackHoleScenario : IScenario, IUmadHazardSource, IBotTargetPicker
 {
+    public UmadHazards GuidanceHazards { get; } = new();
+
+    // Where melee may keep to the boss: the stretches of this scenario's own clock with no cast to dodge, soak or face for 4 s or more.
+    internal static readonly (float From, float To)[] UptimeWindows =
+    [
+        (0f, 12.4f), (26.5f, 31.3f), (33.8f, 38.3f), (56.9f, 61.8f), (88.2f, 96.1f), (110.5f, 118.1f), (124.9f, 129.6f), (140.9f, 145.7f), (159.2f, 164f),
+    ];
+    private const float UptimeReach = 2f;
+
+    public SimEnemy? TargetFor(PartyRole role) => state?.Tanks.BossFor(role, cast.Chaos, cast.Exdeath);
+
     public string Name => "Black Hole";
     public IPhase Phase => UmadZone.P3;
+    public bool SupportsMitigationPractice => true;
 
     public void DrawSettings() { settingsWindow.Draw(); settingsWindow.DrawThunderIIIPlan(); }
     public bool HasPerPlayerSettings => true;
@@ -33,6 +47,7 @@ public sealed class UmadP3BlackHoleScenario : IScenario
 
     public IReadOnlyList<IScenarioAi> AiStrats =>
     [
+        new UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder.ByLineNumber),
         new UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder.DpsSupportAccretion),
         new UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder.SupportDpsAccretion),
     ];
@@ -62,6 +77,8 @@ public sealed class UmadP3BlackHoleScenario : IScenario
 
     public void Run(SimWorld worldParam, int? selectedAi)
     {
+        GuidanceHazards.Clear();
+        foreach (var (from, to) in UptimeWindows) worldParam.Uptime.Allow(from, to, UptimeReach);
         AnoMech.Core.DiagnosticLog.Clear();
         Play(worldParam, selectedAi, Roll(worldParam), new UmadP3Cast());
     }
@@ -83,6 +100,13 @@ public sealed class UmadP3BlackHoleScenario : IScenario
         LastState = state;
         if (selectedAi is { } idx && idx < AiStrats.Count)
             ((IScenarioAi<UmadP3BlackHoleState>)AiStrats[idx]).Run(state, world);
+        if (!cast.Chained)
+            world.MitPractice.Begin(UmadP3BlackHoleMitigation.Plan(state.Tanks, (state.ThunderSet1, state.ThunderSet2)),
+                new Dictionary<MitSource, Func<SimCharacter?>>
+                {
+                    [UmadMitigation.Chaos] = () => state.ScenarioObjects.Chaos,
+                    [UmadMitigation.Exdeath] = () => state.ScenarioObjects.Exdeath,
+                });
 
         PrimodialCrustsToResolve = 0;
 
@@ -322,7 +346,7 @@ public sealed class UmadP3BlackHoleScenario : IScenario
         world.Events.Add(32.40f, () => exdeath_4000414C?.Cast(ActionId.Aetherlink_Exdeath, animationLock: 3.1f));
         world.Events.Add(33.29f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(36.34f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
-        world.Events.Add(37.59f, () => exdeath_4000414C?.Cast(ActionId.ThunderIII_Cast, animationLock: 3.1f));
+        world.Events.Add(37.59f, () => UmadP3Cast.CastThunderBuster(exdeath_4000414C, party));
         world.Events.Add(44.37f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(47.41f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(50.45f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
@@ -330,12 +354,12 @@ public sealed class UmadP3BlackHoleScenario : IScenario
         world.Events.Add(56.51f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(59.54f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(77.78f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
-        world.Events.Add(78.85f, () => exdeath_4000414C?.Cast(ActionId.ThunderIII_Cast, animationLock: 3.1f));
+        world.Events.Add(78.85f, () => UmadP3Cast.CastThunderBuster(exdeath_4000414C, party));
         world.Events.Add(85.85f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(88.89f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(91.91f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(99.18f, () => exdeath_4000414C?.Cast(ActionId.Aetherlink_Exdeath, animationLock: 3.1f));
-        world.Events.Add(113.38f, () => exdeath_4000414C?.Cast(UmadActions.WhiteHole));
+        world.Events.Add(113.38f, () => exdeath_4000414C?.Cast(state.HpCheck == HpCheckMode.Fail ? UmadActions.WhiteHoleOnAHurtParty : UmadActions.WhiteHole));
         world.Events.Add(122.45f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(125.48f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
         world.Events.Add(141.51f, () => exdeath_4000414C?.Cast(UmadActions.ExdeathAutoAttack, ExdeathTank));
@@ -361,8 +385,10 @@ public sealed class UmadP3BlackHoleScenario : IScenario
     private void Run_Kefka_40004141()
     {
         var kefkaPos = new Placement(new Vector3(0.000f, 0.000f, 0.000f), 0);
-        // A full run's Kefka has grown with his own Max cast already.
+        // A full run's Kefka has grown with his own Max cast already. On its own the drill casts it,
+        // as long before the status as the full run's: cactbot takes Kefka's id from that cast.
         world.Events.Add(0f, () => kefka = cast.Kefka ??= UmadP3Cast.SpawnKefka(world, new Placement(new Vector3(0.000f, 0.000f, 0.000f), 0.000f), SpawnVisibility.HiddenUntilShown));
+        if (!cast.Chained) world.Events.Add(0.90f, () => kefka?.Cast(ActionId.Max, animationLock: 1.1f));
         if (!cast.Chained) world.Events.Add(5.88f, () => kefka?.AddStatus(StatusId.Max, stacks: (ushort)506, overrideStacks: true));
         world.Events.Add(5.88f, () => kefka?.SetModelState((byte)0x05));
         world.Events.Add(5.88f, () => kefka?.SetPosition(kefkaPos));
@@ -521,12 +547,28 @@ public sealed class UmadP3BlackHoleScenario : IScenario
         }
     }
     
-    private void RunActiveBlackHole(Vector3 pos, float spawnTime, float tetherTime, float firstShotTime, int numberOfShots)
+    // A null tetherTime: the hole spawns tethered, as retail spawns each set's fresh holes (the tether
+    // is in the spawn, which ACT logs as a 272 with it and no 35). Sets 2 and 6 tether an existing hole.
+    private void RunActiveBlackHole(Vector3 pos, float spawnTime, float? tetherTime, float firstShotTime, int numberOfShots)
     {
         SimEnemy? black_Hole_40004166 = null;
         SimTether? tether = null;
-        world.Events.Add(spawnTime, () => black_Hole_40004166 = world.SpawnEnemy(new EnemySpawnConfig(BNpcBaseId: BNpcBaseId.BlackHole, NameId: BNpcNameId.BlackHole, Level: 100, Targetable: false, EnemyList: EnemyListMode.Never, Visibility: SpawnVisibility.Visible, LayoutId: BNpcLayoutId.BlackHole, Placement: FacingCentre(pos))));
-        world.Events.Add(tetherTime, () => tether = world.Tether(black_Hole_40004166!, End.Passable(), TetherId.GrabbyTether));
+        var hole = new EnemySpawnConfig(BNpcBaseId: BNpcBaseId.BlackHole, NameId: BNpcNameId.BlackHole, Level: 100, Targetable: false, EnemyList: EnemyListMode.Never, Visibility: SpawnVisibility.Visible, LayoutId: BNpcLayoutId.BlackHole, Placement: FacingCentre(pos));
+        if (tetherTime is { } at)
+        {
+            world.Events.Add(spawnTime, () => black_Hole_40004166 = world.SpawnEnemy(hole));
+            world.Events.Add(at, () => tether = world.Tether(black_Hole_40004166!, End.Passable(), TetherId.GrabbyTether));
+        }
+        else
+        {
+            world.Events.Add(spawnTime, () =>
+            {
+                var holder = party.Find.RandomMember(world.Rng);
+                black_Hole_40004166 = world.SpawnEnemy(hole with { TetherId = TetherId.GrabbyTether, TetherTargetId = holder?.EntityId ?? 0xE0000000 });
+                if (black_Hole_40004166 is not null)
+                    tether = world.AdoptSpawnTether(black_Hole_40004166, End.Passable(holder), TetherId.GrabbyTether);
+            });
+        }
         
         var fadeOutDelay = 1.05f;
         var shootCooldown = 5.1f;
@@ -566,18 +608,18 @@ public sealed class UmadP3BlackHoleScenario : IScenario
 
     private void Run_Black_Hole_40004166()
     {
-        RunActiveBlackHole(BlackHolePositions[0][2], 25.17f, 26.00f, 32.27f, 1);
+        RunActiveBlackHole(BlackHolePositions[0][2], 25.17f, null, 32.27f, 1);
         RunActiveBlackHole(BlackHolePositions[0][1], 25.17f, 32.27f, 39.33f, 1);
         RunActiveBlackHole(BlackHolePositions[0][0], 25.17f, 32.27f, 39.33f, 1);
         
         for (var i = 0; i < 3; i++)
         {
-            RunActiveBlackHole(BlackHolePositions[1][i], 55.70f, 56.36f, 62.83f, 3);
-            RunActiveBlackHole(BlackHolePositions[2][i], 89.95f, 90.77f, 97.12f, 3);
+            RunActiveBlackHole(BlackHolePositions[1][i], 55.70f, null, 62.83f, 3);
+            RunActiveBlackHole(BlackHolePositions[2][i], 89.95f, null, 97.12f, 3);
         }
         
-        RunActiveBlackHole(BlackHolePositions[3][0], 123.83f, 124.33f, 130.60f, 1);
-        RunActiveBlackHole(BlackHolePositions[3][1], 123.83f, 124.33f, 130.60f, 1);
+        RunActiveBlackHole(BlackHolePositions[3][0], 123.83f, null, 130.60f, 1);
+        RunActiveBlackHole(BlackHolePositions[3][1], 123.83f, null, 130.60f, 1);
         RunActiveBlackHole(BlackHolePositions[3][2], 123.83f, 130.60f, 137.67f, 1);
     }
 

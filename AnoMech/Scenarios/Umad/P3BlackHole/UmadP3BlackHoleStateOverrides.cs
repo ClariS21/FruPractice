@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using AnoMech.Core.Game.Party;
+using AnoMech.Scenarios.Umad.P4KefkaSays;
 
 namespace AnoMech.Scenarios.Umad.P3BlackHole;
 
@@ -42,6 +43,9 @@ public sealed class UmadP3BlackHoleStateOverrides
     public int? MiniBlackHoleChirality { get; set; }                  // -1 / +1
     public PartyRole[]? StackTargets { get; set; }                    // in stack order
     public PartyRole? EdictTarget { get; set; }
+    // White Hole petrifies whoever isn't at full HP. The sim can't tell, so this says whether the
+    // party was; anything but Fail passes.
+    public HpCheckMode HpCheck { get; set; } = HpCheckMode.Pass;
     public bool SeatLinesInRoleOrder { get; set; }                    // false = roll; true = slot i holds PartyRole i, overriding the per-seat requests
 
     // Defaults: MT solo-tanks Set 1 behind an invuln, Set 2 is shared MT-first.

@@ -38,7 +38,10 @@ party changes will not show and ready checks will not pop until you leave. AnoMe
 - P4: Kefka Says, and the full phase.
 - P5: Celestriad, Exaflares, Flood, Forsaken Null, and the full phase.
 - The tanks follow the Omnitank priority for their pair (Warrior, then Dark Knight, Gunbreaker, Paladin): it decides who holds Chaos in P3 and who invulns the first Surprise Holy in P5.
-- The sim has no boss HP. The P4 full phase's HP check is a Pass/Fail setting, and in the P5 full phase Kefka dies at a time you pick (214 s by default).
+- Mitigation practice follows the Ikuya DMU mitigation sheet, with real damage numbers; the tank rows follow the boss each tank holds.
+- Black Hole's default strat takes the tethers by line number (First, Second, Third in Line); D>S>A and S>D>A are options.
+- The sim has no boss HP. The P4 full phase's HP check and P3's White Hole check are Pass/Fail settings, and in the P5 full phase Kefka dies at a time you pick (214 s by default).
+- The path guide shows Dancing Mad's danger zones, and cactbot reads Dancing Mad runs through ActBridge.
 
 Each drill runs on its own; the full-phase runs chain a phase's mechanics, carrying their results from one into the next.
 
@@ -59,7 +62,7 @@ Each drill runs on its own; the full-phase runs chain a phase's mechanics, carry
 
 - Visuals closely match retail, but damage snapshot timings are best guesses.
 - Not all skills resolve properly.
-- Dancing Mad (Ultimate) has no mitigation plans, guide danger zones or uptime windows yet, and its runs send nothing to ACT, so cactbot stays quiet there.
+- Dancing Mad (Ultimate): a few hits land on full HP because the bot healers cannot top the party up between them as real healers would (Knock Down, Stomp-a-Mole, P4 Inferno and Tsunami, the Celestriad towers, Holy, Forsaken's follow-ups). In drills that start mid-fight, a few cactbot calls that need an earlier phase's cast stay quiet.
 
 ## Acknowledgments
 

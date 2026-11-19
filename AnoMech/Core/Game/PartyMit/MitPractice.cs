@@ -149,6 +149,8 @@ public sealed class MitPractice
             return;
         }
         if (world.Party.Get(p.Slot) is not { } who || !who.IsAlive()) return;
+        // A seat the player has taken back from its bot is theirs to press.
+        if (who is SimPlayer && !world.Party.IsBotDriven(who)) return;
         var key = (p.Slot, p.Action.ActionId);
         if (p.Action.Recast > 0f && lastPress.TryGetValue(key, out var last) && now - last < p.Action.Recast - RecastSlack)
         {
@@ -161,7 +163,9 @@ public sealed class MitPractice
             return;
         }
         var bosses = p.Action.Kind == MitKind.Debuff ? DebuffTargets(p) : [];
-        var target = bosses.FirstOrDefault() ?? (data!.Entries[p.Entry].Buddy ? world.Party.Get(OtherTank(p.Slot)) : null);
+        var entry = data!.Entries[p.Entry];
+        var target = bosses.FirstOrDefault()
+                     ?? (entry.Target is { } seat ? world.Party.Get(seat) : entry.Buddy ? world.Party.Get(OtherTank(p.Slot)) : null);
         if (who is SimPartyNpc bot)
         {
             // A real player never presses over a cast bar.

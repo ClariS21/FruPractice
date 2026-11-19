@@ -31,6 +31,7 @@ public sealed class FruZone : IZone
     public string Name => "Futures Rewritten";
     public uint TerritoryId => 1238;
     public Vector3 Origin => new(100f, 0f, 100f);
+    public uint DirectorId => DirectorEventId;
 
     public IReadOnlyList<WaymarkLayout> WaymarkPresets { get; } =
         [new WaymarkLayout("Inner Circle", InnerCircleWaymarks)];

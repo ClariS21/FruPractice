@@ -58,6 +58,17 @@ public class ActLineTests
         => Assert.That(ActLine.GainsEffect(0xB9A, "Lightsteeped", 20f, Boss, Player, 3), Is.EqualTo(
             "26|B9A|Lightsteeped|20.00|40000001|Oracle of Darkness|10000001|Player One|03|600|2000"));
 
+    [TestCase(0x00, "00")]
+    [TestCase(0x03, "03")]
+    [TestCase(0xFF, "FF")]
+    [TestCase(0x45F, "45F")]
+    [TestCase(0x462, "462")]
+    public void StatusCountPreservesTheFullParam(int param, string count)
+    {
+        Assert.That(ActLine.GainsEffect(0x808, "X", 20, Boss, Player, (ushort)param).Split('|')[8], Is.EqualTo(count));
+        Assert.That(ActLine.LosesEffect(0x808, "X", Boss, Player, (ushort)param).Split('|')[8], Is.EqualTo(count));
+    }
+
     [Test]
     public void GainsEffectFromNoSource()
         => Assert.That(ActLine.GainsEffect(0xB9A, "X", 0f, ActLineActor.None, Player, 0), Is.EqualTo("26|B9A|X|0.00|E0000000||10000001|Player One|00|600|0"));
@@ -98,4 +109,27 @@ public class ActLineTests
     [Test]
     public void ActorControlExtra()
         => Assert.That(ActLine.ActorControlExtra(0x40000001, 0x3F, 4, 0, 0, 0), Is.EqualTo("273|40000001|003F|4|0|0|0"));
+
+    // The expected lines are the LogGuide's examples.
+    [Test]
+    public void AbilityExtraWithoutALocation()
+        => Assert.That(ActLine.AbilityExtra(0x4000619F, 0x8BC0, 0x664, null, 3.141f, 0x1234ABCD),
+            Is.EqualTo("264|4000619F|8BC0|00000664|0||||3.141|1234ABCD"));
+
+    [Test]
+    public void AbilityExtraWithALocation()
+        => Assert.That(ActLine.AbilityExtra(0x4000619D, 0x8BC0, 0x662, new Vector3(1f, 2f, 3f), 1.57f, 0x1234ABCD),
+            Is.EqualTo("264|4000619D|8BC0|00000662|1|1.000|2.000|3.000|1.570|1234ABCD"));
+
+    [Test]
+    public void AbilityExtraWithNoAnimationTarget()
+        => Assert.That(ActLine.AbilityExtra(0x4000619F, 0x8BC0, 0x664, null, 0f, 0), Does.EndWith("|0.000|E0000000"));
+
+    [Test]
+    public void SpawnNpcExtra()
+        => Assert.That(ActLine.SpawnNpcExtra(0x4000226B, ActLine.NoActor, 0, 1), Is.EqualTo("272|4000226B|E0000000|0000|01"));
+
+    [Test]
+    public void SpawnNpcExtraWithATether()
+        => Assert.That(ActLine.SpawnNpcExtra(0x40001234, ActLine.NoActor, 0x54, 0), Is.EqualTo("272|40001234|E0000000|0054|00"));
 }

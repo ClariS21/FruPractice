@@ -56,7 +56,10 @@ public sealed class SimTether : ISimObject
     public bool StretchLt(float distance) =>
         A is { } a && B is { } b && Vector3.DistanceSquared(a.JudgedPosition, b.JudgedPosition) < distance * distance;
 
-    internal SimTether(ITetherEnd from, ITetherEnd to, TetherContext ctx, ushort debuffStatusId, float duration, SimEvents? events)
+    // `drawnAtSpawn`: the source spawned with this tether to the seeded target, so the client already
+    // shows it and retail sends no SetTether for it.
+    internal SimTether(ITetherEnd from, ITetherEnd to, TetherContext ctx, ushort debuffStatusId, float duration, SimEvents? events,
+        bool drawnAtSpawn = false)
     {
         this.events = events;
         this.from = from;
@@ -79,7 +82,7 @@ public sealed class SimTether : ISimObject
             currentSource = from.Resolve(null, currentTarget, ctx);
         }
 
-        CreateVfx();
+        if (!drawnAtSpawn) CreateVfx();
         if (debuffStatusId != 0 && duration > 0f)
         {
             statusA = currentSource?.AddStatus(debuffStatusId, duration);

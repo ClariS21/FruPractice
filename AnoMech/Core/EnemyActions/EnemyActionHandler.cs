@@ -56,6 +56,8 @@ internal sealed class EnemyActionHandler(SimCharacter caster, SimCast cast, SimW
         // Resolve goes first: an instant action runs both inline, and the ActionEffect carries the hits.
         var delivery = new Delivery();
         var resolveAt = castTime + action.Timing.ResolveSnapshotOffset;
+        if (action.Effects.Count > 0)
+            (world.HazardSource as Core.Game.Guidance.IGuidanceCastObserver)?.CastStarted(action, caster, target, location, world.Events.Elapsed + MathF.Max(0f, resolveAt));
         var releaseAt = action.Cast.CastSecondsOverride is { } bar ? bar + CastSpec.ActionEffectOffset : sheetCastTime;
         if (action.Effects.Count > 0)
             Schedule(resolveAt, () =>
@@ -151,6 +153,7 @@ internal sealed class EnemyActionHandler(SimCharacter caster, SimCast cast, SimW
             ? caster.Placement().Face(target.Position)
             : target?.Placement()
               ?? (location is { } at ? new Placement(at, caster.Rotation) : caster.Placement());
+        (world.HazardSource as Core.Game.Guidance.IGuidanceCastObserver)?.CastResolved(action, caster, origin);
         var ctx = new EnemyActionContext(action, caster, target, origin, party, releaseDelay, world.PartyHp);
 
         // A party member's own action never hits them.

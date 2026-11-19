@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using AnoMech.Core;
@@ -21,6 +22,12 @@ internal sealed class UmadP3Opening : IWorldEventListener
     internal const float ShortCrystalAt = 42.73f;
     internal const float LongCrystalAt = 69.70f;
     internal const float BowelsResolvesAt = 22.56f;
+    // The three crystals appear just after Bowels of Agony lands; each element crystal fades a beat
+    // after its attack and leaves once the fade has played.
+    internal const float CrystalsAppearAt = 22.95f;
+    internal const float ShortCrystalFadesAt = 43.42f;
+    internal const float LongCrystalFadesAt = 70.55f;
+    private const float CrystalFadeSeconds = 1f;
     internal const float ShortDebuffSeconds = 19.0f;
     internal const float LongDebuffSeconds = 46.0f;
     internal const float WindSeconds = 68.0f;
@@ -38,6 +45,8 @@ internal sealed class UmadP3Opening : IWorldEventListener
     private UmadP3OpeningState state = null!;
     private UmadP3Cast cast = null!;
     private Placement implosionFrom;
+    private SimEventObject? shortCrystal;
+    private SimEventObject? longCrystal;
 
     public void Play(SimWorld worldParam, bool withAi, UmadP3OpeningState stateParam, UmadP3Cast castParam)
     {
@@ -45,6 +54,7 @@ internal sealed class UmadP3Opening : IWorldEventListener
         party = world.Party;
         state = stateParam;
         cast = castParam;
+        shortCrystal = longCrystal = null;
         DiagnosticLog.Info($"[UmadP3Opening] Roll: {state.ShortElement} first, fire crystal on the {(state.FireSide > 0 ? "right" : "left")}, "
             + $"wind crystal {UmadP3LimitCutState.SpotName(state.BossSpot)}, {(state.Implosion == ActionId.LongitudinalImplosion ? "Longitudinal" : "Latitudinal")} Implosion, "
             + string.Join(" ", state.Debuffs.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}")) + ".");
@@ -58,7 +68,7 @@ internal sealed class UmadP3Opening : IWorldEventListener
             cast.Chaos?.Follow(ChaosTank);
             cast.Exdeath?.Follow(ExdeathTank);
         });
-        world.Events.Add(3.15f, ResolveDecisiveBattle);
+        world.Events.Add(3.15f, () => UmadDecisiveBattle.Resolve(party, cast.Chaos, cast.Exdeath));
         world.Events.Add(4.37f, () => cast.Kefka?.Cast(ActionId.KefkaRest, animationLock: 1.1f));
         world.Events.Add(7.36f, () => cast.Kefka?.SetAnimationState(0, 1));
         for (var at = 6f; at < 69f; at += AutoEvery)
@@ -68,6 +78,7 @@ internal sealed class UmadP3Opening : IWorldEventListener
         }
         world.Events.Add(17.59f, () => cast.Chaos?.Cast(UmadActions.BowelsOfAgony));
         world.Events.Add(BowelsResolvesAt, ApplyBowelsOfAgony);
+        world.Events.Add(CrystalsAppearAt, SpawnCrystals);
         // Exdeath holds the middle from his blast until the buster is done.
         world.Events.Add(ThunderBlastAt - 0.07f, () =>
         {
@@ -76,7 +87,9 @@ internal sealed class UmadP3Opening : IWorldEventListener
         });
         world.Events.Add(ThunderBlastAt, () => cast.Exdeath?.Cast(UmadActions.ThunderIIIBlast));
         world.Events.Add(ShortCrystalAt, () => FireCrystal(state.ShortElement));
-        world.Events.Add(45.89f, () => cast.Exdeath?.Cast(ActionId.ThunderIII_Cast, animationLock: 3.1f));
+        world.Events.Add(ShortCrystalFadesAt, () => shortCrystal?.FadeOut());
+        world.Events.Add(ShortCrystalFadesAt + CrystalFadeSeconds, () => shortCrystal?.Despawn());
+        world.Events.Add(45.89f, () => UmadP3Cast.CastThunderBuster(cast.Exdeath, party));
         foreach (var at in ThunderHitsAt) world.Events.Add(at, ResolveThunder);
         world.Events.Add(54.5f, () => cast.Exdeath?.Follow(ExdeathTank));
         world.Events.Add(56.61f, () => cast.Kefka?.Cast(ActionId.KefkaUnrest, animationLock: 1.1f));
@@ -87,6 +100,8 @@ internal sealed class UmadP3Opening : IWorldEventListener
         world.Events.Add(ShockwavesAt[1], () => Shockwaves(1));
         world.Events.Add(LongCrystalAt, () => FireCrystal(state.LongElement));
         world.Events.Add(LongCrystalAt + 0.2f, SettleBossesForTheLimitCut);
+        world.Events.Add(LongCrystalFadesAt, () => longCrystal?.FadeOut());
+        world.Events.Add(LongCrystalFadesAt + CrystalFadeSeconds, () => longCrystal?.Despawn());
     }
 
     private SimCharacter? ChaosTank => party.Get(state.Tanks.Chaos);
@@ -119,17 +134,6 @@ internal sealed class UmadP3Opening : IWorldEventListener
         boss.Cast(auto, tank);
     }
 
-    // The four nearest Chaos fight it, the rest Exdeath.
-    private void ResolveDecisiveBattle()
-    {
-        if (cast.Chaos is not { } chaos) return;
-        chaos.AddStatus(StatusId.EpicVillain);
-        cast.Exdeath?.AddStatus(StatusId.FatedVillain);
-        var epic = party.Find.ClosestN(chaos.Position, 4);
-        foreach (var member in party.ActiveMembers())
-            member.AddStatus(epic.Contains(member) ? StatusId.EpicHero : StatusId.FatedHero);
-    }
-
     private void StripHeroes()
     {
         foreach (var member in party.ActiveMembers())
@@ -149,9 +153,23 @@ internal sealed class UmadP3Opening : IWorldEventListener
         foreach (var member in party.ActiveMembers())
             if (member is ISimPartyMember pm)
                 member.AddStatus(state.Winds[pm.Role] == Wind.Headwind ? StatusId.Headwind : StatusId.Tailwind, WindSeconds);
-        var crystal = state.WindCrystal;
-        cast.WindCrystal ??= UmadP3Cast.SpawnWindCrystal(world, state.BossSpot, new Vector3(crystal.X, 0f, crystal.Y), state.Hold + MathF.PI);
     }
+
+    // On the spots the elements fire from; the Limit Cut takes the wind crystal over.
+    private void SpawnCrystals()
+    {
+        shortCrystal = SpawnElementCrystal(state.ShortElement);
+        longCrystal = SpawnElementCrystal(state.LongElement);
+        var wind = state.WindCrystal;
+        cast.WindCrystal ??= UmadP3Cast.SpawnWindCrystal(world, state.BossSpot, new Vector3(wind.X, 0f, wind.Y), state.Hold + MathF.PI);
+    }
+
+    private SimEventObject? SpawnElementCrystal(UmadP3Element element) => world.SpawnEventObject(new EventObjectSpawnConfig
+    {
+        EObjId = element == UmadP3Element.Fire ? EObjId.FireCrystal : EObjId.WaterCrystal,
+        TargetableStatus = 5,
+        Placement = CrystalPlacement(element),
+    });
 
     public void OnStatusLost(StatusLost lost)
     {

@@ -52,6 +52,9 @@ public sealed class SimWorld : ISimObject, IDisposable
 
     public BotTiming BotTiming { get; set; } = BotTiming.HumanLike;
 
+    // A test switch: the human's seat comes as late as each AiManager deadline allows. Never set in game.
+    internal bool LatePlayer { get; set; }
+
     // The zone's, for the whole stay: a run's first and last ACT lines are written outside the run.
     public ZoneCalibration Calibration { get; internal set; } = ZoneCalibration.All;
 
@@ -167,10 +170,14 @@ public sealed class SimWorld : ISimObject, IDisposable
     public SimTether TetherFarestPlayer(SimCharacter? a, ushort tetherId, float duration = 0f, ushort debuffStatusId = 0)
         => CreateTether(End.Fixed(a), End.FarthestPlayer(), tetherId, duration, debuffStatusId);
 
+    // Takes over a tether `from` spawned with (EnemySpawnConfig.TetherId, to `to`'s seed): the client
+    // already draws it, so nothing is sent until an end moves.
+    public SimTether AdoptSpawnTether(SimCharacter? from, ITetherEnd to, ushort tetherId)
+        => CreateTether(End.Fixed(from), to, tetherId, 0f, 0, drawnAtSpawn: true);
 
-    private SimTether CreateTether(ITetherEnd from, ITetherEnd to, ushort tetherId, float duration, ushort debuffStatusId)
+    private SimTether CreateTether(ITetherEnd from, ITetherEnd to, ushort tetherId, float duration, ushort debuffStatusId, bool drawnAtSpawn = false)
     {
-        var tether = new SimTether(from, to, new TetherContext(Party.Find, tetherId, Rng), debuffStatusId, duration, SimEvents);
+        var tether = new SimTether(from, to, new TetherContext(Party.Find, tetherId, Rng), debuffStatusId, duration, SimEvents, drawnAtSpawn);
         children.Add(tether);
         return tether;
     }

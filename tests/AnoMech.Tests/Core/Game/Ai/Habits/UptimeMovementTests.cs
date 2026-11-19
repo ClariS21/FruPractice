@@ -214,6 +214,14 @@ public class UptimeMovementTests
     [TestCase(typeof(AnoMech.Scenarios.Fru.P4Full.FruP4FullScenario))]
     [TestCase(typeof(AnoMech.Scenarios.Fru.P3Apocalypse.FruP3ApocalypseScenario))]
     [TestCase(typeof(AnoMech.Scenarios.Fru.P3UltimateRelativity.FruP3UltimateRelativityScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Umad.P3LimitCut.UmadP3LimitCutScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Umad.P3BlackHole.UmadP3BlackHoleScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Umad.P3Full.UmadP3FullScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Umad.P4KefkaSays.UmadP4KefkaSaysScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Umad.P4Full.UmadP4FullScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Umad.P5Exaflares.UmadP5ExaflaresScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Umad.P5Flood.UmadP5FloodScenario))]
+    [TestCase(typeof(AnoMech.Scenarios.Umad.P5Full.UmadP5FullScenario))]
     public void UptimeNeverActsOutsideADeclaredWindow(Type scenario)
     {
         var issued = new List<UptimeMove>();

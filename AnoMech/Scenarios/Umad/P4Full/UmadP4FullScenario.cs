@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
+using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
 using AnoMech.Scenarios.Umad.P4KefkaSays;
 using Dalamud.Bindings.ImGui;
@@ -11,10 +13,20 @@ namespace AnoMech.Scenarios.Umad.P4Full;
 // in (its clock is the real one minus that), and the tail the drill lacks is its HP-check branch: on a pass Kefka's
 // second Poof (125.8 s) and Ultima Upsurge (cast 127.2 s, resolves 132.2 s) and Kefka untargetable at 132.2 s, then the
 // phase ends at 163 s. The sim has no boss HP, so the HP check is the HpCheckMode setting, Pass by default here.
-public sealed class UmadP4FullScenario : IScenario
+public sealed class UmadP4FullScenario : IScenario, IUmadHazardSource
 {
+    public UmadHazards GuidanceHazards { get; } = new();
+
+    // Where melee may keep to the boss: the stretches of this scenario's own clock with no cast to dodge, soak or face for 4 s or more.
+    internal static readonly (float From, float To)[] UptimeWindows =
+    [
+        (0f, 13.8f), (21.4f, 28.7f), (36.4f, 43.9f), (51.5f, 60.2f), (67.8f, 74.2f), (85.9f, 90.1f), (102.8f, 107.2f), (121f, 131f),
+    ];
+    private const float UptimeReach = 2f;
+
     public string Name => "Full phase";
     public IPhase Phase => UmadZone.P4;
+    public bool SupportsMitigationPractice => true;
 
     // The drill's own clock starts this far into the real phase (the real Kefka Says begins 1.45 s after it).
     public const float P4ClockOffset = 3.75f;
@@ -43,9 +55,12 @@ public sealed class UmadP4FullScenario : IScenario
 
     public void Run(SimWorld world, int? selectedAi)
     {
+        GuidanceHazards.Clear();
+        foreach (var (from, to) in UptimeWindows) world.Uptime.Allow(from, to, UptimeReach);
         playing = false;
         var state = drill.Roll(world);
         Kefka = null;
+        world.MitPractice.Begin(MitigationPlan(state.HpCheck), new Dictionary<MitSource, Func<SimCharacter?>> { [UmadMitigation.Kefka] = () => Kefka });
         world.Events.Add(0f, () => Kefka = UmadP4KefkaSaysScenario.SpawnKefka(world));
         world.Events.Add(P4ClockOffset, () =>
         {
@@ -55,6 +70,10 @@ public sealed class UmadP4FullScenario : IScenario
         // Nothing happens on the log between Kefka going untargetable and the phase end; the run ends there.
         world.Events.Add(PhaseEnd, () => { });
     }
+
+    // The drill's plan on the phase's clock; the second Ultima Upsurge comes only on a passed HP check.
+    internal static MitPlanData MitigationPlan(HpCheckMode hpCheck)
+        => MitPlanChain.Of((UmadP4KefkaSaysMitigation.Plan(secondUpsurge: hpCheck == HpCheckMode.Pass), P4ClockOffset));
 
     public void Tick(float delta, float elapsed)
     {

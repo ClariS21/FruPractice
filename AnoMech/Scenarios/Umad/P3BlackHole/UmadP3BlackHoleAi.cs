@@ -11,10 +11,11 @@ namespace AnoMech.Scenarios.Umad.P3BlackHole;
 
 public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder) : IScenarioAi<UmadP3BlackHoleState>
 {
-    public enum TetherOrder { DpsSupportAccretion, SupportDpsAccretion }
+    public enum TetherOrder { ByLineNumber, DpsSupportAccretion, SupportDpsAccretion }
 
     public string Name => tetherOrder switch
     {
+        TetherOrder.ByLineNumber => "Black Hole: By line number",
         TetherOrder.SupportDpsAccretion => "Black Hole: S>D>A",
         _ => "Black Hole: D>S>A",
     };
@@ -24,8 +25,20 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
     // Accretion seats (3 and 7) take the third tether either way.
     private static readonly int[] SupportsBeforeDps = [4, 5, 6, 3, 0, 1, 2, 7];
 
-    private int TetherSeat(int seat) =>
-        tetherOrder == TetherOrder.SupportDpsAccretion ? SupportsBeforeDps[seat] : seat;
+    private int TetherSeat(int seat) => tetherOrder switch
+    {
+        TetherOrder.SupportDpsAccretion => SupportsBeforeDps[seat],
+        TetherOrder.ByLineNumber => HigherInThePartyListFirst(seat),
+        _ => seat,
+    };
+
+    private int HigherInThePartyListFirst(int seat)
+    {
+        if (seat is 3 or 7) return seat;
+        var line = seat % 4;
+        var (first, second) = state.Roles[line] < state.Roles[line + 4] ? (line, line + 4) : (line + 4, line);
+        return seat >= 4 ? first : second;
+    }
 
     private UmadP3BlackHoleState state = null!;
     private SimWorld world = null!;
@@ -86,8 +99,10 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
         world.Events.Add(60.1f, () => PullTether(playerIndex: 3));
         world.Events.Add(64f, () => GrabTether(tetherIndex: 0, playerIndex: 5, intercept: 1f));
         world.Events.Add(66f, () => ReturnToMiddle(playerIndex: 4));
+        world.Events.Add(66.1f, () => SwappedInHolderTakesTheGroupsSpotByLineNumber(playerIndex: 5));
         world.Events.Add(69f, () => GrabTether(tetherIndex: 1, playerIndex: 1, intercept: 1f));
         world.Events.Add(71f, () => ReturnToMiddle(playerIndex: 0));
+        world.Events.Add(71.1f, () => SwappedInHolderTakesTheGroupsSpotByLineNumber(playerIndex: 1));
         ai.Move(73.1f, DodgeEdictAndLookUpon);
         ai.Move(80f, StackCentre);
         world.Events.Add(82f, ResolveSecondThunder);
@@ -106,8 +121,10 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
         world.Events.Add(94.3f, () => PullTether(playerIndex: 7));
         world.Events.Add(98f, () => GrabTether(tetherIndex: 0, playerIndex: 6, intercept: 1f));
         world.Events.Add(100f, () => ReturnToMiddle(playerIndex: 5));
+        world.Events.Add(100.1f, () => SwappedInHolderTakesTheGroupsSpotByLineNumber(playerIndex: 6));
         world.Events.Add(103f, () => GrabTether(tetherIndex: 1, playerIndex: 2, intercept: 1f));
         world.Events.Add(105f, () => ReturnToMiddle(playerIndex: 1));
+        world.Events.Add(105.1f, () => SwappedInHolderTakesTheGroupsSpotByLineNumber(playerIndex: 2));
         // 7, 6 and 2 hold their tether spots until the wave's holes despawn (~109.3): earlier,
         // a still-tethered hole's next Nothingness would follow them into the stack. Recalled
         // with lead time before Implosion.
@@ -649,10 +666,12 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
         var bhPos = new Vector2(blackHole.Position.X, blackHole.Position.Z);
         var heldPos = new Vector2(held.Position.X, held.Position.Z);
         // Pull spot, then nudged 1.5y farther from the black hole along the bh→player axis.
-        var rawSpot = CardinalClockwise(bhPos) + Vector2.Normalize(heldPos - bhPos) * 1.5f;
         // The raw spot can coincide with a passive hole's avoid radius (both ~14y out), where
         // ClampOutside and Steer fight and the bot stalls; push it clear up front.
-        var spot = world.Obstacles.ClampOutside(rawSpot, margin: 2f);
+        var (rawSpot, clearance) = tetherOrder == TetherOrder.ByLineNumber
+            ? (GroupsTetherSpot(bhPos), GroupsTetherSpotClearance)
+            : (CardinalClockwise(bhPos) + Vector2.Normalize(heldPos - bhPos) * 1.5f, 2f);
+        var spot = world.Obstacles.ClampOutside(rawSpot, margin: clearance);
         AnoMech.Core.DiagnosticLog.Info($"[UmadP3BlackHoleAi] PullTether: {role} held at ({heldPos.X:F1},{heldPos.Y:F1}), black hole at ({bhPos.X:F1},{bhPos.Y:F1}) -- moving to ({spot.X:F1},{spot.Y:F1}) (dist {Vector2.Distance(heldPos, spot):F1}y){(spot != rawSpot ? $" [nudged from ({rawSpot.X:F1},{rawSpot.Y:F1}) to clear an obstacle]" : "")}.");
         player?.MoveTo(new Vector3(spot.X, 0f, spot.Y));
     }
@@ -690,14 +709,25 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
         return new Vector2(dir.X * c - dir.Y * s, dir.X * s + dir.Y * c) * TetherPullRadius;
     }
 
+    private const float GroupsTetherSpotTurn = 68f * MathF.PI / 180f;
+    private const float GroupsTetherSpotRadius = 8.6f;
+    private const float GroupsTetherSpotClearance = 0.5f;
+
+    private static Vector2 GroupsTetherSpot(Vector2 hole) => RotateVec(Vector2.Normalize(hole), GroupsTetherSpotTurn) * GroupsTetherSpotRadius;
+
+    private void SwappedInHolderTakesTheGroupsSpotByLineNumber(int playerIndex)
+    {
+        if (tetherOrder == TetherOrder.ByLineNumber) PullTether(playerIndex);
+    }
+
     // Stomp a Mole resolves in Kefka's spawn frame (KefkaPosition[4]): the two towers
     // sit ±10 along Kefka's east-west, the spreads/stacks along its north-south. All the
     // formations below are authored in that frame and rotated onto it. Roles split into a
-    // support group (0-3) and a DPS group (4-7); within each, even indices are the "west"
-    // pair and odd indices the "east" pair, so a role's side is consistent from the
-    // preposition through the corner spread to the towers.
-    private static readonly int[] SupportGroup = [0, 1, 2, 3];
-    private static readonly int[] DpsGroup = [4, 5, 6, 7];
+    // support group and a DPS group; within each, even indices are the "west" pair (the
+    // Exdeath tank's light party) and odd indices the "east" pair (the Chaos tank's), so a
+    // role's side is consistent from the preposition through the corner spread to the towers.
+    private int[] SupportGroup => [(int)state.Tanks.Exdeath, (int)state.Tanks.Chaos, (int)PartyRole.ShieldHealer, (int)PartyRole.RegenHealer];
+    private static readonly int[] DpsGroup = [(int)PartyRole.MeleeDpsB, (int)PartyRole.MeleeDpsA, (int)PartyRole.CasterDps, (int)PartyRole.PhysRangedDps];
     private const float StompTowerX = 10f;        // tower offset along Kefka's east-west axis
     private const float StompTowerPairGap = 1.5f; // the two soakers straddle the tower centre
     private const float StompSeatJitter = 0.3f;
@@ -717,12 +747,18 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
     // intercardinal corners two-per-corner (supports north, DPS south, west pair vs east).
     // The x=±10 seats are 7.5y from the nearer tower spot: Blizzard's r=6 puddle plus two
     // seats' jitter ruled out the 6.5y a symmetric corner gave, and leaves room for 0.3y each.
-    private IAiMove StompBlizzardCorners() =>
-        AiMove.Create(
-                  new(-8f, -10f), new(8f, -10f), new(-10f, -9f), new(10f, -9f),
-                  new(-8f, 10f), new(8f, 10f), new(-10f, 9f), new(10f, 9f))
-              .NaturalOrder()
-              .ApplyPositions(state.KefkaPosition[4].Apply);
+    private IAiMove StompBlizzardCorners()
+    {
+        Vector2[] supportCorners = [new(-8f, -10f), new(8f, -10f), new(-10f, -9f), new(10f, -9f)];
+        Vector2[] dpsCorners = [new(-8f, 10f), new(8f, 10f), new(-10f, 9f), new(10f, 9f)];
+        var coords = new Vector2?[8];
+        for (var i = 0; i < 4; i++)
+        {
+            coords[SupportGroup[i]] = supportCorners[i];
+            coords[DpsGroup[i]] = dpsCorners[i];
+        }
+        return AiMove.Create(coords).NaturalOrder().ApplyPositions(state.KefkaPosition[4].Apply);
+    }
 
     // Second spread has dropped on the corners: the stacking group collapses to centre
     // for the first knockback stack, the other group pairs onto the two towers.

@@ -21,7 +21,6 @@ internal sealed class ActEmitter
     private const uint CancelCastCategory = 0x0F;
     private const uint DeathAnimationCategory = 0x0E;
     private const uint InterruptedLogMessage = 540;
-    private const uint FruDirectorId = 0x800375D2;
     private const uint InstanceSecondsRemaining = 0x1C20;
 
     private readonly IActLineSink sink;
@@ -72,9 +71,12 @@ internal sealed class ActEmitter
         game.RunEnded += RunEnded;
     }
 
+    // The run's zone: its director is the one retail's 33 lines name.
+    private uint? DirectorId => game?.Zone?.DirectorId;
+
     private void RunStarted() => Guard("33 commence", () =>
     {
-        if (Active) Emit(ActLine.ActorControl(FruDirectorId, 0x40000006, InstanceSecondsRemaining));
+        if (Active && DirectorId is { } director) Emit(ActLine.ActorControl(director, 0x40000006, InstanceSecondsRemaining));
     });
 
     private void CloseHeldStatuses() => Guard("30 run end", () =>
@@ -92,12 +94,12 @@ internal sealed class ActEmitter
 
     private void RunEnded() => Guard("33 wipe", () =>
     {
-        if (!Active) return;
-        Emit(ActLine.ActorControl(FruDirectorId, 0x40000005));
-        Emit(ActLine.ActorControl(FruDirectorId, 0x4000000F, InstanceSecondsRemaining));
-        Emit(ActLine.ActorControl(FruDirectorId, 0x40000011));
+        if (!Active || DirectorId is not { } director) return;
+        Emit(ActLine.ActorControl(director, 0x40000005));
+        Emit(ActLine.ActorControl(director, 0x4000000F, InstanceSecondsRemaining));
+        Emit(ActLine.ActorControl(director, 0x40000011));
         // The first wipe takes cactbot out of combat; the second resets its trigger data.
-        Emit(ActLine.ActorControl(FruDirectorId, 0x4000000F, InstanceSecondsRemaining));
+        Emit(ActLine.ActorControl(director, 0x4000000F, InstanceSecondsRemaining));
     });
 
     private bool Active => sink.Connected && enabled() && (game is null || game.World.Calibration.ActEmission);
@@ -168,6 +170,8 @@ internal sealed class ActEmitter
             Emit(ActLine.ActionEffect(count > 1, source, effect.ActionId, ability, target, targets?[i].Effects, sequence, i, count,
                 (uint)effect.ActionType, effect.SpellId, effect.AnimationLock, MathUtil.QuantizeRotation(effect.Rotation)));
         }
+        Emit(ActLine.AbilityExtra(source.Id, effect.ActionId, sequence, count > 1 ? effect.Position : null,
+            MathUtil.NormalizeRotation(effect.Rotation), effect.AnimationTarget?.ObjectId ?? 0));
     }
 
     private void Control(EmittingBattleChara chara, uint category, uint[] args) => Guard($"ActorControl 0x{category:X}", () => ControlLines(chara, category, args));
@@ -234,11 +238,14 @@ internal sealed class ActEmitter
                 Emit(ActLine.LosesEffect(slot.StatusId, Natives.Data.StatusName(slot.StatusId), Actor(slot.SourceEntityId), target, slot.Param));
     }
 
-    private void Spawned(uint entityId, Placement placement) => Guard("271", () => SpawnedLine(entityId, placement));
+    private void Spawned(uint entityId, EnemySpawnConfig config, Placement placement) => Guard("272", () => SpawnedLines(entityId, config, placement));
 
-    private void SpawnedLine(uint entityId, Placement placement)
+    // The sim's spawn packets carry no animation state or parent.
+    private void SpawnedLines(uint entityId, EnemySpawnConfig config, Placement placement)
     {
-        if (Active) Emit(ActLine.ActorSetPos(entityId, placement.Position, placement.Rotation));
+        if (!Active) return;
+        Emit(ActLine.SpawnNpcExtra(entityId, ActLine.NoActor, config.TetherId, 0));
+        Emit(ActLine.ActorSetPos(entityId, placement.Position, placement.Rotation));
     }
 
     private EmittingBattleChara Wrap(IBattleCharaProxy chara)
@@ -257,7 +264,7 @@ internal sealed class ActEmitter
         public IBattleCharaProxy? SpawnBattleNpcFromPacket(EnemySpawnConfig config, Placement placement, out uint entityId)
         {
             if (emitter.realCharas.SpawnBattleNpcFromPacket(config, placement, out entityId) is not { } chara) return null;
-            emitter.Spawned(entityId, placement);
+            emitter.Spawned(entityId, config, placement);
             return emitter.Wrap(chara);
         }
 

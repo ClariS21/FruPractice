@@ -1,5 +1,6 @@
 using System;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.SimObjects;
 using AnoMech.Core.UserActions;
 
 namespace AnoMech.Scenarios.Umad.P5Full;
@@ -20,4 +21,9 @@ internal static class UmadP5TankPair
         => InvulnsFirst(true, mainTank, offTank) == (orchestra == 0) ? PartyRole.MainTank : PartyRole.OffTank;
 
     public static PartyRole StartsWithBoss(JobId mainTank, JobId offTank) => HolyTank(mainTank, offTank, 1);
+
+    // The run's pair: the seat that invulns first, which the sheet's MT column stands for.
+    public static PartyRole FirstInvuln(SimParty party) => HolyTank(JobOf(party, PartyRole.MainTank), JobOf(party, PartyRole.OffTank), 0);
+
+    private static JobId JobOf(SimParty party, PartyRole seat) => (JobId)((party.Get(seat) as ISimPartyMember)?.ClassJob ?? 0);
 }

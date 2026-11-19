@@ -15,6 +15,9 @@ public interface IZone
     uint TerritoryId { get; }
     Vector3 Origin { get; }
 
+    // The instance's content director: retail's director lines (33) name it.
+    uint DirectorId { get; }
+
     // At least one; [0] is the default.
     IReadOnlyList<WaymarkLayout> WaymarkPresets { get; }
 

@@ -104,7 +104,8 @@ internal sealed unsafe class BattleCharas : IBattleCharas
         ref var common = ref packet.Common;
         common.TargetId = 0xE0000000;
         common.OwnerId = 0xE0000000;
-        common.TetherTargetId = 0xE0000000;
+        common.TetherTargetId = config.TetherTargetId;
+        common.TetherId = config.TetherId;
         common.BaseId = config.BNpcBaseId;
         common.NameId = config.NameId;
         common.LayoutId = config.LayoutId;

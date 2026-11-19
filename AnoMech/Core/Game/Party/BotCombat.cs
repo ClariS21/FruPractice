@@ -129,7 +129,7 @@ internal sealed class BotCombat(SimWorld world)
             clock.Rot.Rng = rng;
             if (!clock.Planned) PlanBursts(bot, clock, rng);
             if (clock.Cast != null) TickCast(bot, clock, rng);
-            else if (CanFight(bot)) Fight(bot, clock, boss, rng);
+            else if (CanFight(bot)) Fight(bot, clock, FindTarget(bot.Role) ?? boss, rng);
         }
     }
 
@@ -137,8 +137,12 @@ internal sealed class BotCombat(SimWorld world)
     internal bool IsCasting(SimPartyNpc bot)
         => bot.Casting.IsCasting || clocks.TryGetValue(bot, out var clock) && clock.Cast != null;
 
-    internal SimEnemy? FindTarget()
+    // `role` lets a scenario that opts in (IBotTargetPicker) send a seat to its own boss; any other gets the shared one.
+    internal SimEnemy? FindTarget(PartyRole? role = null)
     {
+        if (role is { } seat && world.SimEvents.Listener is IBotTargetPicker picker
+            && picker.TargetFor(seat) is { IsActive: true, Targetable: true } picked)
+            return picked;
         SimEnemy? first = null;
         foreach (var enemy in world.Children.OfType<SimEnemy>())
         {

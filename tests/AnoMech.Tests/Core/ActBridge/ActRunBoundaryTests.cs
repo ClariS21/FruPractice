@@ -71,13 +71,13 @@ public class ActRunBoundaryTests
 
             game.StartScenario(parameters);
             fake.Frame(1f / 60f, game.Tick);
-            var secondStart = sink.Lines.FindIndex(firstEnd, line => line.StartsWith("33|800375D2|40000006|"));
+            var secondStart = sink.Lines.FindIndex(firstEnd, line => line.StartsWith("33|800375BF|40000006|"));
             for (var i = 0; i < 14 * 60; i++) fake.Frame(1f / 60f, game.Tick);
             var secondEnd = sink.Lines.Count;
 
             game.StartScenario(parameters);
             fake.Frame(1f / 60f, game.Tick);
-            var thirdStart = sink.Lines.FindIndex(secondEnd, line => line.StartsWith("33|800375D2|40000006|"));
+            var thirdStart = sink.Lines.FindIndex(secondEnd, line => line.StartsWith("33|800375BF|40000006|"));
             for (var i = 0; i < 14 * 60; i++) fake.Frame(1f / 60f, game.Tick);
             var thirdEnd = sink.Lines.Count;
             return new Stream(sink.Lines.ToList(), firstEnd, secondStart, secondEnd, thirdStart, thirdEnd);
@@ -98,11 +98,11 @@ public class ActRunBoundaryTests
         Assert.That(stream.ThirdStart, Is.GreaterThan(stream.SecondEnd));
         var boundary = new[]
         {
-            "33|800375D2|40000005|00|00|00|00",
-            "33|800375D2|4000000F|1C20|00|00|00",
-            "33|800375D2|40000011|00|00|00|00",
-            "33|800375D2|4000000F|1C20|00|00|00",
-            "33|800375D2|40000006|1C20|00|00|00",
+            "33|800375BF|40000005|00|00|00|00",
+            "33|800375BF|4000000F|1C20|00|00|00",
+            "33|800375BF|40000011|00|00|00|00",
+            "33|800375BF|4000000F|1C20|00|00|00",
+            "33|800375BF|40000006|1C20|00|00|00",
         };
         Assert.That(lines.Skip(stream.SecondStart - 4).Take(5), Is.EqualTo(boundary));
         Assert.That(lines.Skip(stream.ThirdStart - 4).Take(5), Is.EqualTo(boundary));

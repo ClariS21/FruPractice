@@ -25,6 +25,14 @@ public sealed class UmadP3Cast
         Targetable: true, EnemyList: EnemyListMode.Always, Visibility: SpawnVisibility.Visible,
         LayoutId: BNpcLayoutId.Exdeath, Placement: at));
 
+    // Exdeath's Thunder III buster cast, at whoever is closest to him: the helper's hits then land on
+    // the closest player, and cactbot's tank swap call reads who the cast's ability line names.
+    public static void CastThunderBuster(SimEnemy? exdeath, SimParty party)
+    {
+        if (exdeath is null) return;
+        exdeath.Cast(ActionId.ThunderIII_Cast, party.Find.Closest(exdeath.Position), animationLock: 3.1f);
+    }
+
     public static SimEnemy? SpawnKefka(SimWorld world, Placement at, SpawnVisibility visibility) => world.SpawnEnemy(new EnemySpawnConfig(
         BNpcBaseId: BNpcBaseId.KefkaP3, NameId: BNpcNameId.Kefka, Level: 100,
         Targetable: false, EnemyList: EnemyListMode.Always, Visibility: visibility,

@@ -201,7 +201,7 @@ internal static class FruP4CrystallizeTimeRoutes
         [CrystallizeTimeAssignment.AeroEast] = At(-21.2f, -11.8f),
         [CrystallizeTimeAssignment.IceWest] = At(-21.35f, -12.28f),
         [CrystallizeTimeAssignment.IceEast] = At(-21.7f, -11.9f),
-        [CrystallizeTimeAssignment.Darkness] = At(-22.3f, 17.4f),
+        [CrystallizeTimeAssignment.Darkness] = At(-22.3f, 11.4f),
         [CrystallizeTimeAssignment.Water] = Puddle(CrystallizeTimeAssignment.AeroEast),
     };
 

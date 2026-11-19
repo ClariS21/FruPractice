@@ -28,6 +28,7 @@ public sealed class UmadP5FullAi(UmadP5FullState state, UmadP5Enmity enmity)
     private const float InvulnLead = 0.7f;
     private const float StartingProvokeAt = 1.5f;
     private const float CelestriadDoneAt = 81f;
+    private const float StandaloneStart = 0.2f;
 
     // Where clears stack for Fell Forces; the spots inside a group are chosen.
     private static readonly Vector3 TankStack = new(0f, 0f, -7f);
@@ -60,8 +61,11 @@ public sealed class UmadP5FullAi(UmadP5FullState state, UmadP5Enmity enmity)
         for (var round = 0; round < holyTanks.Length; round++) Orchestra(ai, world, round);
         ai.Move(CelestriadDoneAt, At(FellForcesSpot), jitter: StackJitter, knownAt: CelestriadDoneAt, knownBy: CueKind.Resolve,
             room: StackRoom, arrivalTime: UmadP5FullScenario.FellForcesAt[5].Stacks - Lead, cue: FellForcesCue);
-        Forsaken(ai, world);
+        Forsaken(ai, world, 0f);
     }
+
+    // The standalone Forsaken drill: its clock starts `origin` s before the full phase's.
+    public void RunForsaken(SimWorld world, float origin) => Forsaken(new AiManager(world), world, origin);
 
     private void TakeKefkaForTheFirstFlare(SimWorld world)
     {
@@ -92,7 +96,7 @@ public sealed class UmadP5FullAi(UmadP5FullState state, UmadP5Enmity enmity)
             cue: new StratCue("Maddening Orchestra", role => SecondNotesWhy(round, role), Guide));
         world.Events.Add(surprise + AfterSnapshot, () => holyTanks[round] = HolderOf(world, StatusId.SurpriseHoly));
         world.Events.Add(surprise + ProvokeReaction, () => { if (holyTanks[round] is { } tank) enmity.ProvokeBy(tank); });
-        world.Events.Add(surprise + UmadP5Orchestra.SurpriseDuration - InvulnLead, () => Invuln(world, holyTanks[round]));
+        world.Events.Add(surprise + UmadP5Orchestra.SurpriseDuration - InvulnLead, () => Invuln(world, holyTanks[round], round));
         ai.Move(secondNotes + AfterSnapshot, At(role => FinaleSpot(round, role)), jitter: StackJitter, knownAt: secondNotes + AfterSnapshot,
             knownBy: CueKind.Resolve, room: StackRoom, arrivalTime: finale - Lead,
             cue: new StratCue("Maddening Orchestra", role => FinaleWhy(round, role), Guide));
@@ -110,9 +114,12 @@ public sealed class UmadP5FullAi(UmadP5FullState state, UmadP5Enmity enmity)
         => ((PartyRole[])[PartyRole.MainTank, PartyRole.OffTank]).Cast<PartyRole?>()
             .FirstOrDefault(tank => world.Party.Get(tank!.Value) is { } member && member.HasStatus(statusId));
 
-    private static void Invuln(SimWorld world, PartyRole? tank)
+    // Mitigation practice's plan presses it for the tank the pair gives this Holy, so a bot never
+    // presses it twice; the strat still does when the Holy went to the other tank.
+    private static void Invuln(SimWorld world, PartyRole? tank, int round)
     {
         if (tank is not { } role || world.Party.Get(role) is not SimPartyNpc bot || !bot.IsAlive()) return;
+        if (world.MitPractice.IsActive && TankJobs(world) is var (main, off) && UmadP5TankPair.HolyTank(main, off, round) == role) return;
         bot.UseAction((JobId)bot.ClassJob switch
         {
             JobId.Warrior => MitActionId.Holmgang,
@@ -200,19 +207,18 @@ public sealed class UmadP5FullAi(UmadP5FullState state, UmadP5Enmity enmity)
         return role == holyTanks[round] ? "invulnerable: take the tank stacks alone" : "stay out of the invulnerable tank's stacks";
     }
 
-    private void Forsaken(AiManager ai, SimWorld world)
+    private void Forsaken(AiManager ai, SimWorld world, float origin)
     {
-        var start = UmadP5FullScenario.FellForcesAt[^1].Stacks + AfterSnapshot;
+        // A drill has no Fell Forces before it: the party is told as it starts.
+        var start = MathF.Max(StandaloneStart, UmadP5FullScenario.FellForcesAt[^1].Stacks + AfterSnapshot - origin);
         var cue = new StratCue("Forsaken", _ => "stack on the marker; then the waymark clockwise past the orange (C, 4, 1, 2, 3)", Guide);
         ai.Move(start, At(role => Clump(ForsakenStart, role)), jitter: TightJitter, knownAt: start, knownBy: CueKind.Resolve, room: TightRoom,
-            arrivalTime: UmadP5Forsaken.MarkerAt[0] - Lead, cue: cue);
-        var exit = UmadP5Forsaken.PuddleRadius + 0.5f;
+            arrivalTime: UmadP5Forsaken.MarkerAt[0] - origin - Lead, cue: cue);
+        // The next waymark is up to 19 y away and the bars end 4.7 s after the drop: too tight for
+        // habit timing's 0.8 s margin, so a plain sprint right after the cast shows.
         foreach (var drop in UmadP5Forsaken.PuddlesAt)
-        {
-            var lands = drop + UmadP5Forsaken.PuddlesLandAfter;
-            ai.Move(drop + AfterSnapshot, At(role => Clump(WaymarkClockwisePastTheOrange(OrangeOmenOrTheStackSpot(world)), role)), jitter: TightJitter,
-                knownAt: drop, knownBy: CueKind.Cast, room: TightRoom, arrivalTime: lands - Lead, outBy: lands, exitDistance: exit, cue: cue);
-        }
+            ai.Move(drop - origin + AfterSnapshot, At(role => Clump(WaymarkClockwisePastTheOrange(OrangeOmenOrTheStackSpot(world)), role)),
+                jitter: TightJitter, sprint: true, cue: cue);
     }
 
     internal static Vector3 WaymarkClockwisePastTheOrange(Vector3 orange)

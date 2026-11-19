@@ -36,13 +36,11 @@ public sealed class UmadZone : IZone
     public string Name => "Dancing Mad (Ultimate)";
     public uint TerritoryId => 1363;
     public Vector3 Origin => new(100f, 0f, 100f);
+    public uint DirectorId => UmadConstants.DirectorEventId;
 
     public IReadOnlyList<WaymarkLayout> WaymarkPresets => Waymarks;
 
     public DutyInitData DutyInitData => UmadReplayData.DutyInitData;
-
-    // The ACT bridge writes FRU's director lines; DMU's cactbot support is still to come.
-    public ZoneCalibration Calibration { get; } = new() { ActEmission = false };
 
     public void Run(SimWorld world)
     {

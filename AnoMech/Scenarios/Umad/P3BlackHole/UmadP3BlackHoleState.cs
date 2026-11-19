@@ -4,6 +4,7 @@ using System.Linq;
 using AnoMech.Core;
 using AnoMech.Core.Game.Party;
 using AnoMech.Core.SimObjects;
+using AnoMech.Scenarios.Umad.P4KefkaSays;
 using static AnoMech.Scenarios.Umad.UmadConstants;
 
 namespace AnoMech.Scenarios.Umad.P3BlackHole;
@@ -31,6 +32,8 @@ public sealed class UmadP3BlackHoleState
     
     public int MiniBlackHoleInitialAngle { get; }
     public int MiniBlackHoleChirality { get; }
+
+    public HpCheckMode HpCheck { get; }
 
     // Read by both the Ai (positioning) and the scenario (mitigation plan); both must agree.
     public ThunderIIIAssignment ThunderSet1 { get; }
@@ -71,6 +74,7 @@ public sealed class UmadP3BlackHoleState
         BlackHoleDirections = Enumerable.Range(0, 4).Select(i => overrides.BlackHoleDirections[i] ?? rng.NextCardinal()).ToList();
         MiniBlackHoleInitialAngle = overrides.MiniBlackHoleInitialAngle ?? rng.NextInt(2);
         MiniBlackHoleChirality = overrides.MiniBlackHoleChirality ?? rng.NextSign();
+        HpCheck = overrides.HpCheck;
     }
 
     // Network replay: only the fields UmadP3BlackHoleAi reads; the rest are placeholders the

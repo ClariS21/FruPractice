@@ -82,6 +82,8 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
     private readonly HashSet<PartyRole> sentToEarlySoak = [];
     private readonly HashSet<PartyRole> cleansing = [];
     private readonly Dictionary<PartyRole, PuddleDetour> detours = new();
+    private readonly Dictionary<PartyRole, (Order Order, int Number)> walks = new();
+    private readonly Dictionary<PartyRole, Vector3> puddlesSeen = new();
     private readonly int[] orders = new int[8];
     private List<Step> steps = [];
     private List<Hazard> hazards = [];
@@ -112,6 +114,8 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
         sentToEarlySoak.Clear();
         cleansing.Clear();
         detours.Clear();
+        walks.Clear();
+        puddlesSeen.Clear();
         Array.Clear(orders);
         AssignSidesByPriority();
         hazards = Hazards().OrderBy(h => h.At).ToList();
@@ -131,6 +135,7 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
             ReactToClawCaught(member, role);
             ReactToFangCleansed(member, role);
         }
+        ReplanWalksAcrossNewPuddles();
         HeadForPuddlesAsTheyDrop();
         ResumeDetoursPastPuddles();
     }
@@ -282,7 +287,7 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
         Send(role, puddle, knownBy, PuddleRoom, cleanses: true);
     }
 
-    private void Send(PartyRole role, Vector3 spot, CueKind knownBy, float room, float? inBy = null, float? outBy = null,
+    internal void Send(PartyRole role, Vector3 spot, CueKind knownBy, float room, float? inBy = null, float? outBy = null,
         Func<Vector3, Vector3, float>? exit = null, bool cleanses = false, float? gatherUntil = null)
     {
         if (!cleanses) cleansing.Remove(role);
@@ -293,6 +298,7 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
     {
         var role = o.Role;
         if (orders[(int)role] != order || world.Party.Get(role) is not { } member || !member.IsAlive()) return;
+        if (!o.DetourLeg) walks[role] = (o, order);
         var now = Now;
         var assignment = assignments[role];
         var spot = o.Spot;
@@ -427,6 +433,38 @@ public sealed class FruP4CrystallizeTimeAi : IScenarioAi<FruP4CrystallizeTimeSta
             detours.Remove(role);
             Issue(detour.UntilGone ? detour.Order : detour.Order with { KeepOut = PastDetourKeepOut }, ++orders[(int)role]);
         }
+    }
+
+    private void ReplanWalksAcrossNewPuddles()
+    {
+        var dropped = state.DragonPuddles.Where(p => !puddlesSeen.TryGetValue(p.Key, out var seen) || Flat(seen, p.Value) > 0.01f).ToList();
+        foreach (var gone in puddlesSeen.Keys.Where(catcher => !state.DragonPuddles.ContainsKey(catcher)).ToList()) puddlesSeen.Remove(gone);
+        foreach (var (catcher, at) in dropped) puddlesSeen[catcher] = at;
+        if (dropped.Count == 0) return;
+        foreach (var (role, walk) in walks.ToList())
+        {
+            if (orders[(int)role] != walk.Number || world.Party.Get(role) is not { } member || !member.IsAlive())
+            {
+                walks.Remove(role);
+                continue;
+            }
+            var keptOutOf = PuddlesToKeepOutOf(member, walk.Order).Select(p => p.Catcher).ToHashSet();
+            if (!dropped.Any(p => keptOutOf.Contains(p.Key) && WalkMeetsPuddle(member, walk.Order, p.Value))) continue;
+            detours.Remove(role);
+            world.Movement.Supersede(role);
+            if (world.Party.IsBotDriven(member)) member.StopMoving();
+            Issue(walk.Order, ++orders[(int)role]);
+        }
+    }
+
+    private bool WalkMeetsPuddle(SimCharacter member, Order o, Vector3 puddle)
+    {
+        var starts = StartsOf(member);
+        if (starts.All(s => Flat(s, o.Spot) <= o.Room + DetourSlack)) return false;
+        if (Flat(o.Spot, puddle) < PuddleKeepOut) return true;
+        if (detours.TryGetValue(o.Role, out var detour) && detour.Number == orders[(int)o.Role])
+            return !SweepClear(starts, detour.Via, puddle, o.KeepOut) || (!detour.UntilGone && !PathClear(detour.Via, o.Spot, puddle, o.KeepOut));
+        return !SweepClear(starts, o.Spot, puddle, o.KeepOut);
     }
 
     private static Vector3 BesidePuddles(Vector3 spot, Vector3 from, IReadOnlyList<Vector3> puddles)

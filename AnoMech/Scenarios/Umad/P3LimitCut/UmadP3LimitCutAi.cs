@@ -34,8 +34,36 @@ public sealed class UmadP3LimitCutAi : IScenarioAi<UmadP3LimitCutState>
         world.Events.Add(33.6f, FirstTankOntoExdeath);
         ai.Move(38.9f, SwapThunderTanks, arrivalTime: 41.2f);
         ScheduleThunderClearance(36.5f, 38.9f, 42.2f);
+        ai.Move(43.4f, EachSideGathersPastItsBoss, arrivalTime: 46.0f,
+            cue: StratCue.ForAll("The Decisive Battle", "Chaos tank, H1 and the melee by Chaos; Exdeath tank, H2 and the ranged by Exdeath", "your group's pulls"));
         ai.Move(47.0f, StackAtBosses);
     }
+
+    private const float BattleSideGap = 2f;
+    private const float BattleSideSpread = 1f;
+    private const float InsideTheArena = 18.5f;
+
+    private IAiMove EachSideGathersPastItsBoss()
+    {
+        if (state.Objects.Chaos is not { } chaos || state.Objects.Exdeath is not { } exdeath) return AiMove.Create().NaturalOrder();
+        var c = Flat(chaos.Position);
+        var e = Flat(exdeath.Position);
+        var apart = c - e;
+        var away = apart.LengthSquared() > 0.25f ? Vector2.Normalize(apart) : Flat(OnCircle(Hold, 1f));
+        var across = new Vector2(-away.Y, away.X);
+        var coords = new Vector2?[8];
+        PartyRole[] chaosSide = [state.Tanks.Chaos, PartyRole.RegenHealer, PartyRole.MeleeDpsA, PartyRole.MeleeDpsB];
+        PartyRole[] exdeathSide = [state.Tanks.Exdeath, PartyRole.ShieldHealer, PartyRole.PhysRangedDps, PartyRole.CasterDps];
+        for (var i = 0; i < 4; i++)
+        {
+            var spread = across * ((i - 1.5f) * BattleSideSpread);
+            coords[(int)chaosSide[i]] = Inside(c + away * BattleSideGap + spread);
+            coords[(int)exdeathSide[i]] = Inside(e - away * (BattleSideGap + 0.5f) + spread);
+        }
+        return AiMove.Create(coords).NaturalOrder();
+    }
+
+    private static Vector2 Inside(Vector2 spot) => spot.Length() > InsideTheArena ? Vector2.Normalize(spot) * InsideTheArena : spot;
 
     private (PartyRole First, PartyRole? Second) ThunderRoles => ThunderIIIPlanning.Roles(state.ThunderPlan);
     private PartyRole ThunderBystanderTank => ThunderRoles.First == PartyRole.MainTank ? PartyRole.OffTank : PartyRole.MainTank;

@@ -7,6 +7,7 @@ using AnoMech.Core;
 using AnoMech.Core.Game;
 using AnoMech.Core.Game.Ai;
 using AnoMech.Core.Game.Party;
+using AnoMech.Core.Game.PartyMit;
 using AnoMech.Core.SimObjects;
 using AnoMech.Scenarios.Umad.P3BlackHole;
 
@@ -18,12 +19,24 @@ using static UmadP3LimitCutState;
 
 // Dancing Mad P3 "Limit Cut". Scenario time 0 is 8.0s before Chaos starts casting Umbra Smash,
 // the earliest start inside this mechanic (the previous resolve is 9.2s before).
-public sealed class UmadP3LimitCutScenario : IScenario
+public sealed class UmadP3LimitCutScenario : IScenario, IUmadHazardSource, IBotTargetPicker
 {
+    public UmadHazards GuidanceHazards { get; } = new();
+
+    // Where melee may keep to the boss: the stretches of this scenario's own clock with no cast to dodge, soak or face for 4 s or more.
+    internal static readonly (float From, float To)[] UptimeWindows =
+    [
+        (0f, 7.1f), (21.6f, 30f), (42.8f, 54f),
+    ];
+    private const float UptimeReach = 2f;
+
+    public SimEnemy? TargetFor(PartyRole role) => state?.Tanks.BossFor(role, state.Objects.Chaos, state.Objects.Exdeath);
+
     public string Name => "Limit Cut";
     public IPhase Phase => UmadZone.P3;
     public float BgmSecondsAtStart => 108.67f;
     public bool SupportsSolo => true;
+    public bool SupportsMitigationPractice => true;
     public IReadOnlyList<IScenarioAi> AiStrats => [new UmadP3LimitCutAi()];
     public void DrawSettings() { settingsWindow.Draw(); settingsWindow.DrawThunderIIIPlan(); }
     public bool HasPerPlayerSettings => true;
@@ -60,7 +73,12 @@ public sealed class UmadP3LimitCutScenario : IScenario
         world.Events.Add(0.09f, () => state.Objects.Chaos?.CastFromHelper(UmadActions.StrayGusts, lost.Holder, at: new Placement(WindCrystalPos, 0f)));
     }
 
-    public void Run(SimWorld worldParam, int? selectedAi) => Play(worldParam, selectedAi, Roll(worldParam), new UmadP3Cast());
+    public void Run(SimWorld worldParam, int? selectedAi)
+    {
+        GuidanceHazards.Clear();
+        foreach (var (from, to) in UptimeWindows) worldParam.Uptime.Allow(from, to, UptimeReach);
+        Play(worldParam, selectedAi, Roll(worldParam), new UmadP3Cast());
+    }
 
     // A full run hands in which seat holds which boss, and the Thunder III plan its own settings chose.
     internal UmadP3LimitCutState Roll(SimWorld worldParam, UmadP3Tanks? tanks = null, ThunderIIIAssignment? thunderPlan = null)
@@ -86,6 +104,12 @@ public sealed class UmadP3LimitCutScenario : IScenario
 
         SpawnActors(cast);
         if (!cast.Chained) ApplyStartingStatuses();
+        if (!cast.Chained)
+            world.MitPractice.Begin(UmadP3LimitCutMitigation.Plan(state.Tanks, state.ThunderPlan), new Dictionary<MitSource, Func<SimCharacter?>>
+            {
+                [UmadMitigation.Chaos] = () => state.Objects.Chaos,
+                [UmadMitigation.Exdeath] = () => state.Objects.Exdeath,
+            });
 
         world.Events.Add(1.0f, () =>
         {
@@ -133,7 +157,7 @@ public sealed class UmadP3LimitCutScenario : IScenario
             world.Events.Add(ChargeAt[k], () => ResolveCharge(clone));
         }
         world.Events.Add(33.29f, () => state.Objects.Exdeath?.Follow());
-        world.Events.Add(33.49f, () => state.Objects.Exdeath?.Cast(ActionId.ThunderIII_Cast, animationLock: 3.1f));
+        world.Events.Add(33.49f, () => UmadP3Cast.CastThunderBuster(state.Objects.Exdeath, party));
         world.Events.Add(38.57f, ResolveThunder);
         world.Events.Add(41.60f, ResolveThunder);
         world.Events.Add(42.10f, () => state.Objects.Exdeath?.Follow(ExdeathTank));
@@ -147,7 +171,7 @@ public sealed class UmadP3LimitCutScenario : IScenario
             state.Objects.Chaos?.Cast(ActionId.DecisiveBattle_Chaos, animationLock: 3.1f);
             state.Objects.Exdeath?.Cast(ActionId.DecisiveBattle_Exdeath, animationLock: 3.1f);
         });
-        world.Events.Add(46.49f, ResolveDecisiveBattle);
+        world.Events.Add(46.49f, () => UmadDecisiveBattle.Resolve(party, state.Objects.Chaos, state.Objects.Exdeath));
         world.Events.Add(46.69f, () =>
         {
             state.Objects.Chaos?.Follow(ChaosTank);
@@ -157,7 +181,7 @@ public sealed class UmadP3LimitCutScenario : IScenario
         world.Events.Add(50.746f, () =>
         {
             state.Objects.Exdeath?.Follow();
-            state.Objects.Exdeath?.Cast(ActionId.ThunderIII_Cast, animationLock: 3.1f);
+            UmadP3Cast.CastThunderBuster(state.Objects.Exdeath, party);
         });
     }
 
@@ -257,16 +281,6 @@ public sealed class UmadP3LimitCutScenario : IScenario
     {
         if (state.Objects.Exdeath is not { } exdeath) return;
         exdeath.CastFromHelper(UmadActions.ThunderIII, party.Find.Closest(exdeath.Position), at: new Placement(WindCrystalPos, 0f));
-    }
-
-    private void ResolveDecisiveBattle()
-    {
-        state.Objects.Chaos?.AddStatus(StatusId.EpicVillain);
-        state.Objects.Exdeath?.AddStatus(StatusId.FatedVillain);
-        foreach (var role in Enum.GetValues<PartyRole>())
-            if (party.Get(role) is { } member && member.IsAlive())
-                member.AddStatus(role == state.Tanks.Chaos || role is PartyRole.RegenHealer or PartyRole.MeleeDpsA or PartyRole.MeleeDpsB
-                    ? StatusId.EpicHero : StatusId.FatedHero);
     }
 
     private void StartUmbraSmash()

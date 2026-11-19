@@ -73,7 +73,7 @@ public class AiManagerCalibrationTests
         Assert.Multiple(() =>
         {
             Assert.That(((IZone)FruZone.Instance).Calibration, Is.SameAs(ZoneCalibration.All));
-            Assert.That(world.Calibration, Is.EqualTo(new ZoneCalibration { ActEmission = false }));
+            Assert.That(world.Calibration, Is.SameAs(((IZone)UmadZone.Instance).Calibration));
         });
     }
 

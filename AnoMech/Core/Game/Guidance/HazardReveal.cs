@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace AnoMech.Scenarios.Fru;
+namespace AnoMech.Core.Game.Guidance;
 
 // How far ahead the hazards that follow a player (or a player's aim) are reported, and how coarsely: they are
 // only known once the player is where the mechanic will find them, and a finer step would hand the guidance run

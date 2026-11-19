@@ -66,8 +66,30 @@ public class ActEmitterTests
         boss.ReceiveActionEffect(new ActionEffectData(ActionId, ActionType.Action, 0.6f, 0, 0, 0, 0f, default,
             Targets: [new ActionEffectTarget(player.GameObjectId, [ActionEffectEntry.Damage(1000, 5)])]));
 
-        Assert.That(sink.Lines, Has.Count.EqualTo(1));
+        // Then its 264.
+        Assert.That(sink.Lines, Has.Count.EqualTo(2));
         Assert.That(sink.Lines[0], Does.StartWith($"21|{boss.EntityId:X8}|{boss.Name}|9D4A|{Ability}|{player.EntityId:X8}|{player.Name}|750003|E8030000|"));
+    }
+
+    [Test]
+    public void ActionEffectOnOneTargetEndsWithAnAbilityExtraWithoutALocation()
+    {
+        var sequence = boss.ReceiveActionEffect(new ActionEffectData(ActionId, ActionType.Action, 0.6f, 0, 0, 0, 1.5f, new Vector3(100f, 0f, 90f),
+            AnimationTarget: player.GameObjectId, Targets: [new ActionEffectTarget(player.GameObjectId)]));
+
+        Assert.That(sink.Lines[^1], Is.EqualTo($"264|{boss.EntityId:X8}|9D4A|{sequence:X8}|0||||1.500|{player.EntityId:X8}"));
+    }
+
+    [Test]
+    public void ActionEffectOnSeveralTargetsEndsWithAnAbilityExtraAtItsLocation()
+    {
+        var other = Natives.BattleCharas.SpawnBattleNpcFromPacket(new EnemySpawnConfig(OracleBNpcBaseId), new Placement(), out _)!;
+        sink.Lines.Clear();
+        var sequence = boss.ReceiveActionEffect(new ActionEffectData(ActionId, ActionType.Action, 0.6f, 0, 0, 0, -1.5f, new Vector3(100f, 0f, 90f),
+            Targets: [new ActionEffectTarget(player.GameObjectId), new ActionEffectTarget(other.GameObjectId)]));
+
+        Assert.That(sink.Lines, Has.Count.EqualTo(3));
+        Assert.That(sink.Lines[2], Is.EqualTo($"264|{boss.EntityId:X8}|9D4A|{sequence:X8}|1|100.000|0.000|90.000|-1.500|E0000000"));
     }
 
     [Test]
@@ -78,7 +100,8 @@ public class ActEmitterTests
         boss.ReceiveActionEffect(new ActionEffectData(ActionId, ActionType.Action, 0.6f, 0, 0, 0, 0f, default,
             Targets: [new ActionEffectTarget(player.GameObjectId), new ActionEffectTarget(other.GameObjectId)]));
 
-        Assert.That(sink.Lines, Has.Count.EqualTo(2));
+        // Then the packet's one 264.
+        Assert.That(sink.Lines, Has.Count.EqualTo(3));
         Assert.That(sink.Lines[0], Does.StartWith("22|"));
         Assert.That(sink.Lines[1], Does.Contain($"|{other.EntityId:X8}|{other.Name}|"));
         Assert.That(sink.Lines[0], Does.Contain("|0|2|||"));
@@ -90,7 +113,8 @@ public class ActEmitterTests
     {
         boss.ReceiveActionEffect(new ActionEffectData(ActionId, ActionType.Action, 0.6f, 0, 0, 0, 0f, default));
 
-        Assert.That(sink.Lines, Has.Count.EqualTo(1));
+        // Then its 264.
+        Assert.That(sink.Lines, Has.Count.EqualTo(2));
         Assert.That(sink.Lines[0], Does.Contain($"|{Ability}|E0000000||0|0|"));
     }
 
@@ -179,12 +203,23 @@ public class ActEmitterTests
     }
 
     [Test]
-    public void SpawnIsAnActorSetPosLine()
+    public void SpawnIsASpawnNpcExtraThenAnActorSetPosLine()
     {
         var spawned = Natives.BattleCharas.SpawnBattleNpcFromPacket(new EnemySpawnConfig(OracleBNpcBaseId), new Placement(new Vector3(1f, 0f, 2f), 0.5f), out var id)!;
 
-        Assert.That(sink.Lines, Is.EqualTo(new[] { $"271|{id:X8}|0.50|00|00|1.00|0.00|2.00" }));
+        Assert.That(sink.Lines, Is.EqualTo(new[] { $"272|{id:X8}|E0000000|0000|00", $"271|{id:X8}|0.50|00|00|1.00|0.00|2.00" }));
         Assert.That(spawned.EntityId, Is.EqualTo(id));
+    }
+
+    [Test]
+    public void ATetherInTheSpawnIsInItsSpawnNpcExtraAndNoTetherLine()
+    {
+        var spawned = Natives.BattleCharas.SpawnBattleNpcFromPacket(new EnemySpawnConfig(OracleBNpcBaseId, TetherId: 0x54, TetherTargetId: player.EntityId),
+            new Placement(), out var id)!;
+
+        Assert.That(sink.Lines[0], Is.EqualTo($"272|{id:X8}|E0000000|0054|00"));
+        Assert.That(sink.Lines, Has.None.StartsWith("35|"));
+        Assert.That(spawned.GetTetherId(0), Is.EqualTo(0x54));
     }
 
     [Test]
