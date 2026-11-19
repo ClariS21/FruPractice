@@ -7,7 +7,7 @@ namespace AnoMech.Tests;
 // The human's stand-in reaches every spot with a deadline at the last safe moment (ScenarioRunOptions.LatePlayer) while the bots
 // keep their own timing, from every seat: no bot may take, use up or stand in the human's tower, puddle, share, tether or spot
 // before the human gets there.
-public class FruLatePlayerTests
+public class ScenarioLatePlayerTests
 {
     private static IEnumerable<TestCaseData> Drills() => Entries(drillsOnly: true);
 
@@ -15,17 +15,18 @@ public class FruLatePlayerTests
 
     private static IEnumerable<TestCaseData> Entries(bool drillsOnly)
         => from scenario in ScenarioCatalog.Create().Scenarios
-           where scenario.Phase.Zone is FruZone && !(drillsOnly && scenario.Name == "Full phase")
+           where !drillsOnly || (scenario.Phase.Zone is FruZone && scenario.Name != "Full phase")
            from strat in Enumerable.Range(0, scenario.AiStrats.Count)
            select new TestCaseData(scenario.GetType(), strat).SetName($"{{m}}({scenario.GetType().Name}, {strat})");
 
-    // Every drill hands the human something of their own; the Full phases play the same drills back to back.
+    // Every FRU drill hands the human something of their own; the Full phases play the same drills back to back. DMU is left
+    // to the Audit.
     [TestCaseSource(nameof(Drills))]
     public void EverySeatKeepsItsPartWhenTheHumanComesLate(Type scenarioType, int strat)
         => AssertAllPassed(Sweep(scenarioType, strat, firstSeed: 1, seeds: 1));
 
     // The full audit, one scenario per process (LateScenario matches the scenario type's name), e.g. from Bash:
-    //   dotnet test tests/AnoMech.Tests --configuration Release --no-build --filter "FullyQualifiedName~FruLatePlayerTests.Audit"
+    //   dotnet test tests/AnoMech.Tests --configuration Release --no-build --filter "FullyQualifiedName~ScenarioLatePlayerTests.Audit"
     //     -- 'TestRunParameters.Parameter(name="LateScenario", value="FruP4DarklitDragonsongScenario")'
     //        'TestRunParameters.Parameter(name="LateSeeds", value="16")'
     // LateFirstSeed moves the seed range. A failure's replay line writes its artifacts.

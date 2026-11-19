@@ -131,10 +131,13 @@ public sealed class FruP4DarklitDragonsongAi(bool playerBaitsSomberDance) : ISce
         _ => FromSim(-25.5f, -5),
     };
 
+    // Tower soakers stand in the far half of their tower: Path of Light aims at the four players
+    // nearest the centre, and from the near half a soaker can be one of them (its cone then hits
+    // the Fragment of Fate and it takes a fifth Lightsteeped stack).
     private static Vector3? Bowtie(PartyRole role, PartyRole[] order)
     {
         var index = Array.IndexOf(order, role);
-        return index < 4 ? Quadrant(index, 19, 5.2f) : Quadrant(index, 6.7f, 14.6f);
+        return index < 4 ? Quadrant(index, 22, 5.2f) : Quadrant(index, 6.7f, 14.6f);
     }
 
     private Vector3? FreeWaterSwap(PartyRole role)

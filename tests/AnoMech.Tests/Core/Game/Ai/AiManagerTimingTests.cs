@@ -171,6 +171,36 @@ public class AiManagerTimingTests
         Assert.That(Vector2.Distance(new Vector2(player.Position.X, player.Position.Z), new Vector2(0f, 3f)), Is.LessThan(0.5f));
     }
 
+    // An earlier walk with no deadline is still under way when a deadline move comes: the late seat lets it run, then turns
+    // back from wherever it has got to, just in time. 20 y away it reaches the end first and waits there; 30 y away it
+    // turns mid-walk, where walking back still just makes 8 s less the margin (6.5 t + 6.5 y back, so t = 3.375 s).
+    [TestCase(20f, 20f, false)]
+    [TestCase(20f, 20f, true)]
+    [TestCase(30f, 21.94f, false)]
+    public void LatePlayerSetsOffFromWhereAnEarlierWalkHasTakenIt(float firstX, float turnX, bool hold)
+    {
+        var (human, player, _) = SeatsForLatePlayer();
+        var ai = new AiManager(world);
+        ai.Move(0f, () => AiMove.Single(human, new Vector2(firstX, 0f)), jitter: 0f);
+        ai.Move(0.1f, () => AiMove.Single(human, new Vector2(-6.5f, 0f)), jitter: 0f, arrivalTime: 8f, hold: hold);
+        var farthest = float.NegativeInfinity;
+        for (var frame = 0; frame < 8 * 60; frame++)
+        {
+            fake.Frame(1f / 60f, delta =>
+            {
+                world.Events.Tick(delta);
+                player.Tick(delta);
+            });
+            farthest = MathF.Max(farthest, player.Position.X);
+        }
+        Assert.Multiple(() =>
+        {
+            Assert.That(farthest, Is.EqualTo(turnX).Within(0.3f), "where it turned back");
+            Assert.That(Vector2.Distance(new Vector2(player.Position.X, player.Position.Z), new Vector2(-6.5f, 0f)), Is.LessThan(0.5f),
+                "on its spot by the deadline");
+        });
+    }
+
     private (PartyRole Human, SimCharacter Player, SimCharacter Bot) SeatsForLatePlayer()
     {
         DebugBotControl.Enabled = true;

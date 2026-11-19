@@ -29,6 +29,11 @@ public sealed class AiManager
     private const float MoveDeadlineSafetyMargin = 0.25f;
     // A strat's own staggered departures still arrive at least this early (user: "don't let the bots cut it close").
     internal const float StaggeredArrivalMargin = 0.8f;
+    // A late seat's departure check runs again on the next frame, whatever the frame time.
+    private const float NextFrame = 0.001f;
+    // What a frame or two of the clock, and of a walk away from the spot, can cost a late seat's departure: past its
+    // latest walking departure by no more than this, it still walks.
+    private const float LateWalkTolerance = 0.05f;
 
     private readonly SimWorld world;
     // A strat's times count from when its AI starts, which is later than the run's start when a
@@ -125,6 +130,13 @@ public sealed class AiManager
                     delay *= 1f - Math.Clamp(settleFraction, 0f, 1f);
                 var speed = sprinting ? SprintSpeed : RunSpeed;
 
+                if (late && departureDelay is null && delay > 0f)
+                {
+                    var deadline = startedAt + arrivalTime!.Value;
+                    AnoMech.Core.DiagnosticLog.Info($"[AiManager] Move@{time:F1}: {role} ({member.Position.X:F1},{member.Position.Z:F1}) -> ({target.X:F1},{target.Z:F1}) for ({local.X:F2},{local.Y:F2}) {dist:F1}y, late for t={deadline:F2}.");
+                    LeaveLate(member, seat, generation, target, deadline, file, line);
+                    continue;
+                }
                 if (sprinting) partyMember?.UseSprint(dist / SprintSpeed + 1f);
                 // `for`: the spot before the jitter, which each client rolls on its own stream.
                 AnoMech.Core.DiagnosticLog.Info($"[AiManager] Move@{time:F1}: {role} ({member.Position.X:F1},{member.Position.Z:F1}) -> ({target.X:F1},{target.Z:F1}) for ({local.X:F2},{local.Y:F2}) {dist:F1}y{(sprinting ? " sprinting" : "")}{(delay > 0f ? $", leaving in {delay:F2}s" : "")}.");
@@ -138,6 +150,26 @@ public sealed class AiManager
                 else member.MoveTo(target, speed: speed);
             }
         }, file, line);
+    }
+
+    // The late player's seat sets off from wherever it stands by then: an earlier walk still under way (a dodge, say) keeps
+    // moving it, so the departure is checked again every frame. It walks on the first frame that walk just makes the
+    // deadline less the safety margin, and sprints if it is later than that by more than a frame or two.
+    private void LeaveLate(SimCharacter member, PartyRole seat, int generation, Vector3 target, float deadline, string file, int line)
+    {
+        if (!world.Movement.Current(seat, generation) || !member.IsAlive()) return;
+        var dist = Vector2.Distance(new Vector2(member.Position.X, member.Position.Z), new Vector2(target.X, target.Z));
+        var slack = deadline - MoveDeadlineSafetyMargin - world.Events.Elapsed - dist / RunSpeed;
+        if (slack > 0f)
+        {
+            world.Events.Add(NextFrame, () => LeaveLate(member, seat, generation, target, deadline, file, line), file, line);
+            return;
+        }
+        var sprinting = slack < -LateWalkTolerance;
+        if (sprinting) (member as ISimPartyMember)?.UseSprint(dist / SprintSpeed + 1f);
+        AnoMech.Core.DiagnosticLog.Info($"[AiManager] {seat} sets off late from ({member.Position.X:F1},{member.Position.Z:F1}), {dist:F1}y{(sprinting ? " sprinting" : "")}.");
+        world.Departures.Add(world.Events.Elapsed, seat);
+        member.MoveTo(target, speed: sprinting ? SprintSpeed : RunSpeed);
     }
 
     // Walk, leaving as late as still arrives in time; sprint now if walking can't make it.

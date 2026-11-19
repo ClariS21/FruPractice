@@ -16,7 +16,7 @@ public class PluginIdentityTests
             Assert.That(PluginIdentity.ChatPrefix, Is.EqualTo("[FRU Practice]"));
             Assert.That(PluginIdentity.FilePrefix, Is.EqualTo("fru-practice"));
             Assert.That(assemblyName.Name, Is.EqualTo(PluginIdentity.InternalName));
-            Assert.That(assemblyName.Version, Is.EqualTo(new Version(0, 4, 0, 0)));
+            Assert.That(assemblyName.Version, Is.EqualTo(new Version(0, 4, 1, 0)));
         });
     }
 }
