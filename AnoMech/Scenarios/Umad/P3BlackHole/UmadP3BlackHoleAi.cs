@@ -11,11 +11,10 @@ namespace AnoMech.Scenarios.Umad.P3BlackHole;
 
 public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder) : IScenarioAi<UmadP3BlackHoleState>
 {
-    public enum TetherOrder { ByLineNumber, DpsSupportAccretion, SupportDpsAccretion }
+    public enum TetherOrder { DpsSupportAccretion, SupportDpsAccretion }
 
     public string Name => tetherOrder switch
     {
-        TetherOrder.ByLineNumber => "Black Hole: By line number",
         TetherOrder.SupportDpsAccretion => "Black Hole: S>D>A",
         _ => "Black Hole: D>S>A",
     };
@@ -25,20 +24,8 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
     // Accretion seats (3 and 7) take the third tether either way.
     private static readonly int[] SupportsBeforeDps = [4, 5, 6, 3, 0, 1, 2, 7];
 
-    private int TetherSeat(int seat) => tetherOrder switch
-    {
-        TetherOrder.SupportDpsAccretion => SupportsBeforeDps[seat],
-        TetherOrder.ByLineNumber => HigherInThePartyListFirst(seat),
-        _ => seat,
-    };
-
-    private int HigherInThePartyListFirst(int seat)
-    {
-        if (seat is 3 or 7) return seat;
-        var line = seat % 4;
-        var (first, second) = state.Roles[line] < state.Roles[line + 4] ? (line, line + 4) : (line + 4, line);
-        return seat >= 4 ? first : second;
-    }
+    private int TetherSeat(int seat) =>
+        tetherOrder == TetherOrder.SupportDpsAccretion ? SupportsBeforeDps[seat] : seat;
 
     private UmadP3BlackHoleState state = null!;
     private SimWorld world = null!;
@@ -99,10 +86,8 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
         world.Events.Add(60.1f, () => PullTether(playerIndex: 3));
         world.Events.Add(64f, () => GrabTether(tetherIndex: 0, playerIndex: 5, intercept: 1f));
         world.Events.Add(66f, () => ReturnToMiddle(playerIndex: 4));
-        world.Events.Add(66.1f, () => SwappedInHolderTakesTheGroupsSpotByLineNumber(playerIndex: 5));
         world.Events.Add(69f, () => GrabTether(tetherIndex: 1, playerIndex: 1, intercept: 1f));
         world.Events.Add(71f, () => ReturnToMiddle(playerIndex: 0));
-        world.Events.Add(71.1f, () => SwappedInHolderTakesTheGroupsSpotByLineNumber(playerIndex: 1));
         ai.Move(73.1f, DodgeEdictAndLookUpon);
         ai.Move(80f, StackCentre);
         world.Events.Add(82f, ResolveSecondThunder);
@@ -121,10 +106,8 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
         world.Events.Add(94.3f, () => PullTether(playerIndex: 7));
         world.Events.Add(98f, () => GrabTether(tetherIndex: 0, playerIndex: 6, intercept: 1f));
         world.Events.Add(100f, () => ReturnToMiddle(playerIndex: 5));
-        world.Events.Add(100.1f, () => SwappedInHolderTakesTheGroupsSpotByLineNumber(playerIndex: 6));
         world.Events.Add(103f, () => GrabTether(tetherIndex: 1, playerIndex: 2, intercept: 1f));
         world.Events.Add(105f, () => ReturnToMiddle(playerIndex: 1));
-        world.Events.Add(105.1f, () => SwappedInHolderTakesTheGroupsSpotByLineNumber(playerIndex: 2));
         // 7, 6 and 2 hold their tether spots until the wave's holes despawn (~109.3): earlier,
         // a still-tethered hole's next Nothingness would follow them into the stack. Recalled
         // with lead time before Implosion.
@@ -666,12 +649,10 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
         var bhPos = new Vector2(blackHole.Position.X, blackHole.Position.Z);
         var heldPos = new Vector2(held.Position.X, held.Position.Z);
         // Pull spot, then nudged 1.5y farther from the black hole along the bh→player axis.
+        var rawSpot = CardinalClockwise(bhPos) + Vector2.Normalize(heldPos - bhPos) * 1.5f;
         // The raw spot can coincide with a passive hole's avoid radius (both ~14y out), where
         // ClampOutside and Steer fight and the bot stalls; push it clear up front.
-        var (rawSpot, clearance) = tetherOrder == TetherOrder.ByLineNumber
-            ? (GroupsTetherSpot(bhPos), GroupsTetherSpotClearance)
-            : (CardinalClockwise(bhPos) + Vector2.Normalize(heldPos - bhPos) * 1.5f, 2f);
-        var spot = world.Obstacles.ClampOutside(rawSpot, margin: clearance);
+        var spot = world.Obstacles.ClampOutside(rawSpot, margin: 2f);
         AnoMech.Core.DiagnosticLog.Info($"[UmadP3BlackHoleAi] PullTether: {role} held at ({heldPos.X:F1},{heldPos.Y:F1}), black hole at ({bhPos.X:F1},{bhPos.Y:F1}) -- moving to ({spot.X:F1},{spot.Y:F1}) (dist {Vector2.Distance(heldPos, spot):F1}y){(spot != rawSpot ? $" [nudged from ({rawSpot.X:F1},{rawSpot.Y:F1}) to clear an obstacle]" : "")}.");
         player?.MoveTo(new Vector3(spot.X, 0f, spot.Y));
     }
@@ -707,17 +688,6 @@ public sealed class UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder tetherOrder)
         var c = MathF.Cos(MathF.PI / 3f);
         var s = MathF.Sin(MathF.PI / 3f);
         return new Vector2(dir.X * c - dir.Y * s, dir.X * s + dir.Y * c) * TetherPullRadius;
-    }
-
-    private const float GroupsTetherSpotTurn = 68f * MathF.PI / 180f;
-    private const float GroupsTetherSpotRadius = 8.6f;
-    private const float GroupsTetherSpotClearance = 0.5f;
-
-    private static Vector2 GroupsTetherSpot(Vector2 hole) => RotateVec(Vector2.Normalize(hole), GroupsTetherSpotTurn) * GroupsTetherSpotRadius;
-
-    private void SwappedInHolderTakesTheGroupsSpotByLineNumber(int playerIndex)
-    {
-        if (tetherOrder == TetherOrder.ByLineNumber) PullTether(playerIndex);
     }
 
     // Stomp a Mole resolves in Kefka's spawn frame (KefkaPosition[4]): the two towers

@@ -47,7 +47,6 @@ public sealed class UmadP3BlackHoleScenario : IScenario, IUmadHazardSource, IBot
 
     public IReadOnlyList<IScenarioAi> AiStrats =>
     [
-        new UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder.ByLineNumber),
         new UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder.DpsSupportAccretion),
         new UmadP3BlackHoleAi(UmadP3BlackHoleAi.TetherOrder.SupportDpsAccretion),
     ];
@@ -98,8 +97,8 @@ public sealed class UmadP3BlackHoleScenario : IScenario, IUmadHazardSource, IBot
         state = stateParam;
         cast = castParam;
         LastState = state;
-        if (selectedAi is { } idx && idx < AiStrats.Count)
-            ((IScenarioAi<UmadP3BlackHoleState>)AiStrats[idx]).Run(state, world);
+        if (selectedAi is { } idx)
+            ((IScenarioAi<UmadP3BlackHoleState>)AiStrats[idx >= 0 && idx < AiStrats.Count ? idx : 0]).Run(state, world);
         if (!cast.Chained)
             world.MitPractice.Begin(UmadP3BlackHoleMitigation.Plan(state.Tanks, (state.ThunderSet1, state.ThunderSet2)),
                 new Dictionary<MitSource, Func<SimCharacter?>>

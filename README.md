@@ -39,7 +39,7 @@ party changes will not show and ready checks will not pop until you leave. AnoMe
 - P5: Celestriad, Exaflares, Flood, Forsaken Null, and the full phase.
 - The tanks follow the Omnitank priority for their pair (Warrior, then Dark Knight, Gunbreaker, Paladin): it decides who holds Chaos in P3 and who invulns the first Surprise Holy in P5.
 - Mitigation practice follows the Ikuya DMU mitigation sheet, with real damage numbers; the tank rows follow the boss each tank holds.
-- Black Hole's default strat takes the tethers by line number (First, Second, Third in Line); D>S>A and S>D>A are options.
+- Black Hole uses D>S>A by default (DPS, then supports, then Accretion, line by line); S>D>A is an option.
 - The sim has no boss HP. The P4 full phase's HP check and P3's White Hole check are Pass/Fail settings, and in the P5 full phase Kefka dies at a time you pick (214 s by default).
 - The path guide shows Dancing Mad's danger zones, and cactbot reads Dancing Mad runs through ActBridge.
 

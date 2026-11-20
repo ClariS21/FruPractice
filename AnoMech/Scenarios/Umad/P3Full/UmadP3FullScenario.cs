@@ -85,7 +85,7 @@ public sealed class UmadP3FullScenario : IScenario, IUmadHazardSource, IBotTarge
         GuidanceHazards.Clear();
         foreach (var (from, to) in UptimeWindows) world.Uptime.Allow(from, to, UptimeReach);
         current = null;
-        var strat = selectedAi is { } idx && idx < AiStrats.Count ? (UmadP3FullStrat)AiStrats[idx] : null;
+        var strat = selectedAi is { } idx ? (UmadP3FullStrat)AiStrats[idx >= 0 && idx < AiStrats.Count ? idx : 0] : null;
         var state = Roll(world);
         var cast = this.cast = new UmadP3Cast { Chained = true };
         tanks = state.Tanks;

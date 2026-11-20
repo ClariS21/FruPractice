@@ -54,7 +54,7 @@ public class UmadP3BlackHoleScenarioTests
     }
 
     // The tether timeline above is D>S>A's.
-    private const int DpsSupportAccretion = 1;
+    private const int DpsSupportAccretion = 0;
 
     private static NegativeRun<UmadP3BlackHoleScenario> BlackHole(PartyRole player)
         => Negative<UmadP3BlackHoleScenario>(player, DpsSupportAccretion)
